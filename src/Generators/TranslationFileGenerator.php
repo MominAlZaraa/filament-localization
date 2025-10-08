@@ -38,7 +38,7 @@ class TranslationFileGenerator
 
         // Check if file exists before writing
         $fileExists = File::exists($translationPath);
-        
+
         // Load existing translations if file exists
         $existingTranslations = [];
         if ($fileExists) {
@@ -74,15 +74,23 @@ class TranslationFileGenerator
 
         return match ($structure) {
             'flat' => "{$basePath}/{$prefix}.php",
-            'nested' => "{$basePath}/{$prefix}/".Str::snake($analysis['resource_name']).'.php',
-            'panel-based' => "{$basePath}/{$prefix}/{$panelId}/".Str::snake($analysis['resource_name']).'.php',
-            default => "{$basePath}/{$prefix}/{$panelId}/".Str::snake($analysis['resource_name']).'.php',
+            'nested' => "{$basePath}/{$prefix}/" . Str::snake($analysis['resource_name']) . '.php',
+            'panel-based' => "{$basePath}/{$prefix}/{$panelId}/" . Str::snake($analysis['resource_name']) . '.php',
+            default => "{$basePath}/{$prefix}/{$panelId}/" . Str::snake($analysis['resource_name']) . '.php',
         };
     }
 
     protected function buildTranslations(array $analysis): array
     {
         $translations = [];
+
+        // Add resource label translations
+        $resourceName = $analysis['resource_name'];
+        $resourceLabel = $this->generateLabelFromResourceName($resourceName);
+
+        $translations['navigation_label'] = Str::plural($resourceLabel);
+        $translations['model_label'] = $resourceLabel;
+        $translations['plural_model_label'] = Str::plural($resourceLabel);
 
         // Add field translations
         foreach ($analysis['fields'] as $field) {
@@ -118,6 +126,17 @@ class TranslationFileGenerator
         }
 
         return $translations;
+    }
+
+    protected function generateLabelFromResourceName(string $resourceName): string
+    {
+        // Remove 'Resource' suffix if present
+        $label = preg_replace('/Resource$/', '', $resourceName);
+
+        // Convert PascalCase to words with spaces
+        $label = preg_replace('/([a-z])([A-Z])/', '$1 $2', $label);
+
+        return $label;
     }
 
     protected function generatePhpArrayContent(array $translations): string

@@ -2,8 +2,22 @@
 
 [![Latest Version on Packagist](https://img.shields.io/packagist/v/mominalzaraa/filament-localization.svg?style=flat-square)](https://packagist.org/packages/mominalzaraa/filament-localization)
 [![Total Downloads](https://img.shields.io/packagist/dt/mominalzaraa/filament-localization.svg?style=flat-square)](https://packagist.org/packages/mominalzaraa/filament-localization)
+[![GitHub Tests Action Status](https://img.shields.io/github/actions/workflow/status/MominAlZaraa/filament-localization/run-tests.yml?branch=main&label=tests&style=flat-square)](https://github.com/MominAlZaraa/filament-localization/actions?query=workflow%3Arun-tests+branch%3Amain)
+[![GitHub Code Style Action Status](https://img.shields.io/github/actions/workflow/status/MominAlZaraa/filament-localization/fix-php-code-style-issues.yml?branch=main&label=code%20style&style=flat-square)](https://github.com/MominAlZaraa/filament-localization/actions?query=workflow%3A"Fix+PHP+code+style+issues"+branch%3Amain)
+[![License](https://img.shields.io/packagist/l/mominalzaraa/filament-localization.svg?style=flat-square)](https://packagist.org/packages/mominalzaraa/filament-localization)
+[![PHP Version](https://img.shields.io/packagist/php-v/mominalzaraa/filament-localization.svg?style=flat-square)](https://packagist.org/packages/mominalzaraa/filament-localization)
+
+![Filament Localization Banner](.github/plugin-banner.jpg)
 
 Automatically scan and localize Filament resources with structured translation files. This package eliminates the repetitive task of manually adding translation keys to every field, column, action, and component in your Filament application.
+
+## Version
+
+**Current Version**: `1.0.0`  
+**License**: MIT  
+**PHP Requirements**: ^8.2|^8.3|^8.4  
+**Laravel Requirements**: ^12.0  
+**Filament Requirements**: ^4.0
 
 ## Features
 
@@ -250,9 +264,10 @@ Do you want to proceed with localization? (yes/no) [yes]:
 
 ## Before and After
 
-### Before
+### Before Localization
 
 ```php
+// app/Filament/Resources/UserResource.php
 TextInput::make('name')
     ->required(),
 
@@ -263,9 +278,10 @@ Action::make('delete')
     ->requiresConfirmation(),
 ```
 
-### After
+### After Localization
 
 ```php
+// app/Filament/Resources/UserResource.php
 TextInput::make('name')
     ->label(__('filament/admin/user_resource.name'))
     ->required(),
@@ -329,16 +345,15 @@ Please see [CHANGELOG](CHANGELOG.md) for more information on what has changed re
 
 ## Contributing
 
-Please see [CONTRIBUTING](CONTRIBUTING.md) for details.
+Contributions are welcome! Please feel free to submit a Pull Request.
 
 ## Security Vulnerabilities
 
-Please review [our security policy](../../security/policy) on how to report security vulnerabilities.
+If you discover a security vulnerability, please send an e-mail to [support@mominpert.com](mailto:support@mominpert.com). All security vulnerabilities will be promptly addressed.
 
 ## Credits
 
-- [Momin Al Zaraa](https://github.com/MominAlZaraa)
-- [All Contributors](../../contributors)
+- [Momin Al Zaraa](https://github.com/MominAlZaraa) - Creator and Maintainer
 
 ## License
 

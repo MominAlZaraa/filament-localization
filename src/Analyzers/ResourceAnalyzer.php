@@ -84,13 +84,50 @@ class ResourceAnalyzer
             'tabs' => [],
             'filters' => [],
             'relation_managers' => [],
+            'schema_files' => [], // Track separate schema files
         ];
 
-        // Analyze form fields
+        // Detect and load separate schema files (like UserForm, UserTable, etc.)
+        $schemaFiles = $this->detectSchemaFiles($content, $resourceClass);
+        $analysis['schema_files'] = $schemaFiles;
+
+        // Analyze form fields (from resource file and schema files)
         $analysis['fields'] = $this->analyzeFormFields($content);
+
+        // Also analyze fields from separate schema files
+        foreach ($schemaFiles['form'] ?? [] as $schemaFile) {
+            if (File::exists($schemaFile['path'])) {
+                $schemaContent = File::get($schemaFile['path']);
+                $schemaFields = $this->analyzeFormFields($schemaContent);
+
+                // Mark fields as being from a schema file
+                foreach ($schemaFields as &$field) {
+                    $field['schema_file'] = $schemaFile['path'];
+                    $field['schema_class'] = $schemaFile['class'];
+                }
+
+                $analysis['fields'] = array_merge($analysis['fields'], $schemaFields);
+            }
+        }
 
         // Analyze table columns
         $analysis['columns'] = $this->analyzeTableColumns($content);
+
+        // Also analyze columns from separate table schema files
+        foreach ($schemaFiles['table'] ?? [] as $schemaFile) {
+            if (File::exists($schemaFile['path'])) {
+                $schemaContent = File::get($schemaFile['path']);
+                $schemaColumns = $this->analyzeTableColumns($schemaContent);
+
+                // Mark columns as being from a schema file
+                foreach ($schemaColumns as &$column) {
+                    $column['schema_file'] = $schemaFile['path'];
+                    $column['schema_class'] = $schemaFile['class'];
+                }
+
+                $analysis['columns'] = array_merge($analysis['columns'], $schemaColumns);
+            }
+        }
 
         // Analyze actions
         $analysis['actions'] = $this->analyzeActions($content);
@@ -110,15 +147,25 @@ class ResourceAnalyzer
     protected function analyzeFormFields(string $content): array
     {
         $fields = [];
+        $foundFields = []; // Track found fields to avoid duplicates
 
         foreach ($this->formComponents as $component) {
             // Match patterns like: TextInput::make('field_name')
-            $pattern = "/{$component}::make\(['\"]([^'\"]+)['\"]\)/";
+            // Use word boundary or namespace separator to ensure exact component name match
+            $pattern = "/(?<![:\w]){$component}::make\(['\"]([^'\"]+)['\"]\)/";
 
             preg_match_all($pattern, $content, $matches);
 
             if (! empty($matches[1])) {
                 foreach ($matches[1] as $fieldName) {
+                    // Skip if this field+component combination was already found
+                    $key = "{$component}::{$fieldName}";
+                    if (isset($foundFields[$key])) {
+                        continue;
+                    }
+
+                    $foundFields[$key] = true;
+
                     // Check if this field already has a label
                     $hasLabel = $this->hasLabel($content, $fieldName, $component);
 
@@ -283,9 +330,33 @@ class ResourceAnalyzer
     protected function hasLabel(string $content, string $fieldName, string $component): bool
     {
         // Look for ->label() after the make() call for this specific field
-        $pattern = "/{$component}::make\(['\"]".preg_quote($fieldName, '/')."['\"]\).*?->label\(/s";
+        // Match from make() to the next field separator (comma followed by whitespace and the next component)
+        // or to the end of the components array (closing bracket/paren)
 
-        return preg_match($pattern, $content) === 1;
+        // First, find the make() call for this field
+        $makePattern = "/{$component}::make\(['\"]" . preg_quote($fieldName, '/') . "['\"]\)/";
+
+        if (!preg_match($makePattern, $content, $matches, PREG_OFFSET_CAPTURE)) {
+            return false;
+        }
+
+        $startPos = $matches[0][1] + strlen($matches[0][0]);
+
+        // Find the next make() call or closing bracket/paren that ends the field
+        // Match: newline + whitespace + (component::make OR ] OR })
+        $endPattern = "/\n\s*(?:\w+::make\(|[\]\}]\))/";
+
+        if (preg_match($endPattern, $content, $endMatches, PREG_OFFSET_CAPTURE, $startPos)) {
+            $endPos = $endMatches[0][1];
+        } else {
+            $endPos = strlen($content);
+        }
+
+        // Extract just this field's definition
+        $fieldContent = substr($content, $startPos, $endPos - $startPos);
+
+        // Check if this field's content contains ->label(
+        return str_contains($fieldContent, '->label(');
     }
 
     protected function generateLabel(string $fieldName): string
@@ -317,5 +388,72 @@ class ResourceAnalyzer
     protected function generateTranslationKey(string $fieldName): string
     {
         return Str::snake($fieldName);
+    }
+
+    protected function detectSchemaFiles(string $content, string $resourceClass): array
+    {
+        $schemaFiles = [
+            'form' => [],
+            'table' => [],
+        ];
+
+        // Detect form schema class: pattern like "return SomeClass::configure($schema)"
+        // This can be in the form() method
+        if (preg_match('/function\s+form\s*\([^)]*\)\s*:\s*Schema\s*{[^}]*return\s+([A-Za-z\\\\]+)::configure\s*\(/s', $content, $matches)) {
+            $schemaClass = $matches[1];
+            $schemaFiles['form'][] = $this->resolveSchemaClass($schemaClass, $resourceClass, $content);
+        }
+
+        // Detect table schema class: pattern like "return SomeClass::configure($table)"
+        // This can be in the table() method
+        if (preg_match('/function\s+table\s*\([^)]*\)\s*:\s*Table\s*{[^}]*return\s+([A-Za-z\\\\]+)::configure\s*\(/s', $content, $matches)) {
+            $schemaClass = $matches[1];
+            $schemaFiles['table'][] = $this->resolveSchemaClass($schemaClass, $resourceClass, $content);
+        }
+
+        return $schemaFiles;
+    }
+
+    protected function resolveSchemaClass(string $schemaClass, string $resourceClass, string $content): array
+    {
+        // If the class name doesn't have a namespace, we need to resolve it from the use statements
+        if (! Str::contains($schemaClass, '\\')) {
+            // Extract use statements from the content
+            preg_match_all('/use\s+([^;]+);/', $content, $useMatches);
+
+            foreach ($useMatches[1] as $useStatement) {
+                if (Str::endsWith($useStatement, '\\' . $schemaClass) || $useStatement === $schemaClass) {
+                    $schemaClass = $useStatement;
+                    break;
+                }
+
+                // Handle aliased imports (use X as Y)
+                if (preg_match('/(.+)\s+as\s+(.+)/', $useStatement, $aliasMatch)) {
+                    if (trim($aliasMatch[2]) === $schemaClass) {
+                        $schemaClass = trim($aliasMatch[1]);
+                        break;
+                    }
+                }
+            }
+
+            // If still not resolved, assume it's in the same namespace as the resource
+            if (! Str::contains($schemaClass, '\\')) {
+                $resourceNamespace = (new ReflectionClass($resourceClass))->getNamespaceName();
+                $schemaClass = $resourceNamespace . '\\' . $schemaClass;
+            }
+        }
+
+        // Try to get the file path for this class
+        try {
+            $reflection = new ReflectionClass($schemaClass);
+            $filePath = $reflection->getFileName();
+        } catch (\Exception $e) {
+            $filePath = null;
+        }
+
+        return [
+            'class' => $schemaClass,
+            'path' => $filePath,
+        ];
     }
 }
