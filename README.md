@@ -269,25 +269,25 @@ Do you want to proceed with localization? (yes/no) [yes]:
 #### Before Localization
 The Filament admin interface displays in English with hardcoded labels:
 
-![Before Localization - Users List](before.png)
+![Before Localization - Users List](photos/before.png)
 *Users list page showing English labels*
 
-![Before Localization - User Edit Form](before-2.png)
+![Before Localization - User Edit Form](photos/before-2.png)
 *User edit form with English field labels*
 
-![Before Localization - File Structure](before-3.png)
+![Before Localization - File Structure](photos/before-3.png)
 *File structure showing only English translation files*
 
 #### After Localization
 The same interface now supports multiple languages with proper translation keys:
 
-![After Localization - Users List](after.png)
+![After Localization - Users List](photos/after.png)
 *Users list page with localized Greek labels*
 
-![After Localization - User Edit Form](after-2.png)
+![After Localization - User Edit Form](photos/after-2.png)
 *User edit form with localized Greek field labels*
 
-![After Localization - File Structure](after-3.png)
+![After Localization - File Structure](photos/after-3.png)
 *File structure showing organized translation files for multiple locales*
 
 ### Code Comparison
