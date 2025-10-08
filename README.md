@@ -55,11 +55,35 @@ Automatically scan and localize Filament resources with structured translation f
 
 ## Installation
 
+### Step 1: Install the Package
+
 You can install the package via composer:
 
 ```bash
 composer require mominalzaraa/filament-localization
 ```
+
+### Step 2: Check Dependencies
+
+Before using the package, check if all required dependencies are installed:
+
+```bash
+php artisan filament:check-dependencies
+```
+
+If dependencies are missing, you can install them automatically:
+
+```bash
+php artisan filament:check-dependencies --install
+```
+
+Or install them manually:
+
+```bash
+composer require laravel/framework:^12.0 filament/filament:^4.0
+```
+
+### Step 3: Publish Configuration
 
 Publish the configuration file:
 
@@ -90,6 +114,20 @@ return [
 ```
 
 ## Usage
+
+### Dependency Management
+
+Check if all required dependencies are installed:
+
+```bash
+php artisan filament:check-dependencies
+```
+
+Install missing dependencies automatically:
+
+```bash
+php artisan filament:check-dependencies --install
+```
 
 ### Basic Usage
 

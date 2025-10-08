@@ -2,6 +2,7 @@
 
 namespace MominAlZaraa\FilamentLocalization;
 
+use MominAlZaraa\FilamentLocalization\Commands\CheckDependenciesCommand;
 use MominAlZaraa\FilamentLocalization\Commands\LocalizeFilamentCommand;
 use Spatie\LaravelPackageTools\Package;
 use Spatie\LaravelPackageTools\PackageServiceProvider;
@@ -13,7 +14,10 @@ class FilamentLocalizationServiceProvider extends PackageServiceProvider
         $package
             ->name('filament-localization')
             ->hasConfigFile()
-            ->hasCommand(LocalizeFilamentCommand::class);
+            ->hasCommands([
+                CheckDependenciesCommand::class,
+                LocalizeFilamentCommand::class,
+            ]);
     }
 
     public function packageBooted(): void
