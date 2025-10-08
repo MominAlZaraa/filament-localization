@@ -13,7 +13,6 @@ Automatically scan and localize Filament resources with structured translation f
 
 ## Version
 
-**Current Version**: `1.0.0`  
 **License**: MIT  
 **PHP Requirements**: ^8.2|^8.3|^8.4  
 **Laravel Requirements**: ^12.0  
