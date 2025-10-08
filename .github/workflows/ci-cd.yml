@@ -82,7 +82,7 @@ jobs:
         run: echo "VERSION=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
 
       - name: Publish to Packagist
-        if: ${{ secrets.PACKAGIST_TOKEN != '' }}
+        if: ${{ secrets.PACKAGIST_TOKEN }}
         run: |
           curl -XPOST -H 'Authorization: Bearer ${{ secrets.PACKAGIST_TOKEN }}' \
           https://packagist.org/api/update-package?username=${{ secrets.PACKAGIST_USERNAME }}&repository=${{ github.repository }}
