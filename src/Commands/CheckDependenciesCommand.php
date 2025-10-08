@@ -30,10 +30,11 @@ class CheckDependenciesCommand extends Command
 
         if (empty($missingRequired) && empty($missingRecommended)) {
             $this->info('✅ All dependencies are satisfied!');
+
             return self::SUCCESS;
         }
 
-        if (!empty($missingRequired)) {
+        if (! empty($missingRequired)) {
             $this->displayMissingDependencies('Required', $missingRequired);
 
             if ($this->option('install') || $this->confirm('Would you like to install missing required dependencies?')) {
@@ -41,10 +42,11 @@ class CheckDependenciesCommand extends Command
             }
 
             $this->error('❌ Required dependencies are missing. Please install them before using this package.');
+
             return self::FAILURE;
         }
 
-        if (!empty($missingRecommended)) {
+        if (! empty($missingRecommended)) {
             $this->displayMissingDependencies('Recommended', $missingRecommended);
 
             if ($this->option('install') || $this->confirm('Would you like to install recommended dependencies?')) {
@@ -80,13 +82,14 @@ class CheckDependenciesCommand extends Command
         $missing = [];
         $composerJson = $this->getComposerJson();
 
-        if (!$composerJson) {
+        if (! $composerJson) {
             $this->error('❌ Could not read composer.json file');
+
             return array_keys($packages);
         }
 
         foreach ($packages as $package => $version) {
-            if (!$this->isPackageInstalled($package, $version, $composerJson)) {
+            if (! $this->isPackageInstalled($package, $version, $composerJson)) {
                 $missing[$package] = $version;
             }
         }
@@ -109,7 +112,8 @@ class CheckDependenciesCommand extends Command
         // Check if package is actually installed via composer show
         try {
             $output = shell_exec("composer show {$package} 2>/dev/null");
-            return !empty($output);
+
+            return ! empty($output);
         } catch (\Exception $e) {
             return false;
         }
@@ -126,11 +130,12 @@ class CheckDependenciesCommand extends Command
     {
         $composerPath = base_path('composer.json');
 
-        if (!File::exists($composerPath)) {
+        if (! File::exists($composerPath)) {
             return null;
         }
 
         $content = File::get($composerPath);
+
         return json_decode($content, true);
     }
 
@@ -144,7 +149,7 @@ class CheckDependenciesCommand extends Command
         }
 
         $this->newLine();
-        $this->info("Install with: composer require " . implode(' ', array_keys($missing)));
+        $this->info('Install with: composer require '.implode(' ', array_keys($missing)));
         $this->newLine();
     }
 
@@ -155,12 +160,12 @@ class CheckDependenciesCommand extends Command
             $packages[] = "{$package}:{$version}";
         }
 
-        $command = "composer require " . implode(' ', $packages);
+        $command = 'composer require '.implode(' ', $packages);
 
         $this->info("🚀 Running: {$command}");
         $this->newLine();
 
-        $output = shell_exec($command . " 2>&1");
+        $output = shell_exec($command.' 2>&1');
         $this->line($output);
 
         // Re-check if installation was successful
@@ -168,9 +173,11 @@ class CheckDependenciesCommand extends Command
 
         if (empty($stillMissing)) {
             $this->info('✅ Dependencies installed successfully!');
+
             return self::SUCCESS;
         } else {
             $this->error('❌ Some dependencies could not be installed. Please install them manually.');
+
             return self::FAILURE;
         }
     }

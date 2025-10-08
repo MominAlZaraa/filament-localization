@@ -40,7 +40,7 @@ class LocalizeFilamentCommand extends Command
         $this->displayWelcomeBanner();
 
         // Check dependencies first
-        if (!$this->checkDependencies()) {
+        if (! $this->checkDependencies()) {
             return self::FAILURE;
         }
 
@@ -137,10 +137,10 @@ class LocalizeFilamentCommand extends Command
         // If specific panels are requested
         if ($this->option('panel')) {
             $requestedPanels = $this->option('panel');
-            $panels = $allPanels->filter(fn($panel) => in_array($panel->getId(), $requestedPanels));
+            $panels = $allPanels->filter(fn ($panel) => in_array($panel->getId(), $requestedPanels));
 
             if ($panels->isEmpty()) {
-                $this->error('❌ No matching panels found for: ' . implode(', ', $requestedPanels));
+                $this->error('❌ No matching panels found for: '.implode(', ', $requestedPanels));
 
                 return [];
             }
@@ -150,7 +150,7 @@ class LocalizeFilamentCommand extends Command
 
         // Filter out excluded panels
         $excludedPanels = config('filament-localization.excluded_panels', []);
-        $panels = $allPanels->filter(fn($panel) => ! in_array($panel->getId(), $excludedPanels));
+        $panels = $allPanels->filter(fn ($panel) => ! in_array($panel->getId(), $excludedPanels));
 
         return $panels->all();
     }
@@ -166,7 +166,7 @@ class LocalizeFilamentCommand extends Command
 
     protected function confirmProcessing(array $panels, array $locales): bool
     {
-        $panelNames = collect($panels)->map(fn($panel) => $panel->getId())->implode(', ');
+        $panelNames = collect($panels)->map(fn ($panel) => $panel->getId())->implode(', ');
 
         $this->table(
             ['Setting', 'Value'],
@@ -271,7 +271,7 @@ class LocalizeFilamentCommand extends Command
             $this->info('✅ Git commit created successfully!');
             $this->info('💡 You can revert this commit using: git reset --soft HEAD~1');
         } catch (\Exception $e) {
-            $this->error('❌ Failed to create git commit: ' . $e->getMessage());
+            $this->error('❌ Failed to create git commit: '.$e->getMessage());
         }
     }
 
@@ -285,12 +285,12 @@ class LocalizeFilamentCommand extends Command
         $missing = [];
 
         foreach ($requiredPackages as $package => $version) {
-            if (!$this->isPackageAvailable($package)) {
+            if (! $this->isPackageAvailable($package)) {
                 $missing[$package] = $version;
             }
         }
 
-        if (!empty($missing)) {
+        if (! empty($missing)) {
             $this->newLine();
             $this->error('❌ Missing required dependencies:');
             $this->newLine();
@@ -301,7 +301,7 @@ class LocalizeFilamentCommand extends Command
 
             $this->newLine();
             $this->info('💡 To install missing dependencies, run:');
-            $this->info('   composer require ' . implode(' ', array_keys($missing)));
+            $this->info('   composer require '.implode(' ', array_keys($missing)));
             $this->newLine();
             $this->info('Or run the dependency check command:');
             $this->info('   php artisan filament:check-dependencies --install');
