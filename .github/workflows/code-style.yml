@@ -1,21 +1,15 @@
-name: Fix PHP code style issues
+name: Code Style
 
 on:
   push:
     branches: [main]
-    paths:
-      - '**.php'
   pull_request:
     branches: [main]
-    paths:
-      - '**.php'
-
-permissions:
-  contents: write
 
 jobs:
-  php-code-styling:
+  code-style:
     runs-on: ubuntu-latest
+    name: Code Style Check
 
     steps:
       - name: Checkout code
@@ -33,11 +27,15 @@ jobs:
       - name: Install dependencies
         run: composer install --prefer-dist --no-interaction
 
-      - name: Fix PHP code style issues
+      - name: Check PHP code style
+        run: vendor/bin/pint --test
+
+      - name: Fix PHP code style issues (on push only)
+        if: github.event_name == 'push' && failure()
         run: vendor/bin/pint
 
-      - name: Commit changes
+      - name: Commit fixed styling (on push only)
+        if: github.event_name == 'push' && failure()
         uses: stefanzweifel/git-auto-commit-action@v5
         with:
-          commit_message: Fix styling
-        if: github.event_name == 'push'
+          commit_message: "style: fix PHP code style issues"

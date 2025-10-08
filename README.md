@@ -1,11 +1,11 @@
 # Filament Localization Package
 
-[![Latest Version on Packagist](https://img.shields.io/packagist/v/mominalzaraa/filament-localization.svg?style=flat-square)](https://packagist.org/packages/mominalzaraa/filament-localization)
-[![Total Downloads](https://img.shields.io/packagist/dt/mominalzaraa/filament-localization.svg?style=flat-square)](https://packagist.org/packages/mominalzaraa/filament-localization)
-[![GitHub Tests Action Status](https://img.shields.io/github/actions/workflow/status/MominAlZaraa/filament-localization/run-tests.yml?branch=main&label=tests&style=flat-square)](https://github.com/MominAlZaraa/filament-localization/actions?query=workflow%3Arun-tests+branch%3Amain)
-[![GitHub Code Style Action Status](https://img.shields.io/github/actions/workflow/status/MominAlZaraa/filament-localization/fix-php-code-style-issues.yml?branch=main&label=code%20style&style=flat-square)](https://github.com/MominAlZaraa/filament-localization/actions?query=workflow%3A"Fix+PHP+code+style+issues"+branch%3Amain)
-[![License](https://img.shields.io/packagist/l/mominalzaraa/filament-localization.svg?style=flat-square)](https://packagist.org/packages/mominalzaraa/filament-localization)
-[![PHP Version](https://img.shields.io/packagist/php-v/mominalzaraa/filament-localization.svg?style=flat-square)](https://packagist.org/packages/mominalzaraa/filament-localization)
+[![Latest Version on Packagist](https://img.shields.io/packagist/v/mominalzaraa/filament-localization?style=flat-square&logo=packagist)](https://packagist.org/packages/mominalzaraa/filament-localization)
+[![Total Downloads](https://img.shields.io/packagist/dt/mominalzaraa/filament-localization?style=flat-square&logo=packagist)](https://packagist.org/packages/mominalzaraa/filament-localization)
+[![GitHub Tests](https://img.shields.io/github/actions/workflow/status/MominAlZaraa/filament-localization/run-tests.yml?branch=main&label=tests&style=flat-square&logo=github)](https://github.com/MominAlZaraa/filament-localization/actions/workflows/run-tests.yml)
+[![Code Style](https://img.shields.io/github/actions/workflow/status/MominAlZaraa/filament-localization/code-style.yml?branch=main&label=code%20style&style=flat-square&logo=github)](https://github.com/MominAlZaraa/filament-localization/actions/workflows/code-style.yml)
+[![License](https://img.shields.io/packagist/l/mominalzaraa/filament-localization?style=flat-square)](https://github.com/MominAlZaraa/filament-localization/blob/main/LICENSE)
+[![PHP Version](https://img.shields.io/packagist/dependency-v/mominalzaraa/filament-localization/php?style=flat-square&logo=php)](https://packagist.org/packages/mominalzaraa/filament-localization)
 
 ![Filament Localization Banner](.github/plugin-banner.jpg)
 
