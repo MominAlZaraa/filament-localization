@@ -1,0 +1,54 @@
+name: Publish Package
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.2'
+          extensions: mbstring, xml, ctype, iconv, intl, pdo_sqlite, dom, filter, gd, iconv, json, mbstring, pdo
+
+      - name: Install dependencies
+        run: composer install --no-dev --no-interaction --prefer-dist
+
+      - name: Validate composer.json
+        run: composer validate --no-check-all
+
+      - name: Publish to Packagist
+        if: ${{ secrets.PACKAGIST_TOKEN }}
+        run: |
+          curl -XPOST -H 'Authorization: Bearer ${{ secrets.PACKAGIST_TOKEN }}' \
+          https://packagist.org/api/update-package?username=${{ secrets.PACKAGIST_USERNAME }}&repository=${{ github.repository }}
+
+      - name: Create GitHub Release
+        uses: actions/create-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: ${{ github.ref }}
+          release_name: Release ${{ github.ref_name }}
+          body: |
+            ## What's Changed
+            - Enhanced README with before/after visual comparisons
+            - Added comprehensive documentation with screenshots
+            - Complete Filament localization package with multi-language support
+            - Automatic scanning and translation file generation
+            - Git integration and safety features
+            
+            ## Installation
+            ```bash
+            composer require mominalzaraa/filament-localization
+            ```
+          draft: false
+          prerelease: false
