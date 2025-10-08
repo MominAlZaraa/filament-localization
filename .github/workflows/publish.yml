@@ -8,6 +8,8 @@ on:
 jobs:
   publish:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
 
     steps:
       - name: Checkout code
@@ -16,39 +18,75 @@ jobs:
       - name: Set up PHP
         uses: shivammathur/setup-php@v2
         with:
-          php-version: '8.2'
-          extensions: mbstring, xml, ctype, iconv, intl, pdo_sqlite, dom, filter, gd, iconv, json, mbstring, pdo
+          php-version: '8.3'
+          extensions: mbstring, xml, ctype, iconv, intl, pdo_sqlite, dom, filter, gd, json, pdo
 
       - name: Install dependencies
-        run: composer install --no-dev --no-interaction --prefer-dist
+        run: composer install --no-dev --no-interaction --prefer-dist --optimize-autoloader
 
       - name: Validate composer.json
         run: composer validate --no-check-all
 
       - name: Publish to Packagist
-        if: ${{ secrets.PACKAGIST_TOKEN }}
+        if: ${{ secrets.PACKAGIST_TOKEN != '' && secrets.PACKAGIST_USERNAME != '' }}
         run: |
+          echo "Publishing to Packagist..."
           curl -XPOST -H 'Authorization: Bearer ${{ secrets.PACKAGIST_TOKEN }}' \
-          https://packagist.org/api/update-package?username=${{ secrets.PACKAGIST_USERNAME }}&repository=${{ github.repository }}
+          "https://packagist.org/api/update-package?username=${{ secrets.PACKAGIST_USERNAME }}&apiToken=${{ secrets.PACKAGIST_TOKEN }}" \
+          -d "repository=https://github.com/${{ github.repository }}"
 
       - name: Create GitHub Release
-        uses: actions/create-release@v1
+        uses: softprops/action-gh-release@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          tag_name: ${{ github.ref }}
-          release_name: Release ${{ github.ref_name }}
+          name: Release ${{ github.ref_name }}
           body: |
-            ## What's Changed
-            - Enhanced README with before/after visual comparisons
-            - Added comprehensive documentation with screenshots
-            - Complete Filament localization package with multi-language support
-            - Automatic scanning and translation file generation
-            - Git integration and safety features
+            ## What's Changed in ${{ github.ref_name }}
             
-            ## Installation
+            ### ✨ Features
+            - Automatic Filament resource scanning and localization
+            - Structured translation file organization following Filament conventions
+            - Git integration with automatic commits for easy rollback
+            - Detailed processing statistics and progress tracking
+            - Selective panel processing (specific panels or all at once)
+            - Safe operation with automatic backups before modification
+            - Multi-locale support for international applications
+            - Dry run mode for previewing changes without applying them
+            
+            ### 🎯 Supported Components
+            - **Form Components**: TextInput, Select, DatePicker, FileUpload, RichEditor, etc.
+            - **Table Columns**: TextColumn, IconColumn, ImageColumn, ColorColumn, etc.
+            - **Infolist Entries**: TextEntry, IconEntry, ImageEntry, etc.
+            - **Layout Components**: Section, Tabs, Grid, Fieldset, etc.
+            - **Actions & Filters**: All action types and table filters
+            
+            ### 📋 Requirements
+            - PHP ^8.2|^8.3|^8.4
+            - Laravel ^12.0
+            - Filament ^4.0
+            
+            ## 🚀 Installation
             ```bash
             composer require mominalzaraa/filament-localization
             ```
+            
+            ## ⚡ Quick Start
+            ```bash
+            # Localize all panels
+            php artisan filament:localize
+            
+            # Localize specific panel
+            php artisan filament:localize --panel=admin
+            
+            # Dry run to preview changes
+            php artisan filament:localize --dry-run
+            ```
+            
+            📖 **Full Documentation**: [README.md](https://github.com/MominAlZaraa/filament-localization#readme)
           draft: false
           prerelease: false
+          files: |
+            composer.json
+            README.md
+            LICENSE
