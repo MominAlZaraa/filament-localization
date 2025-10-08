@@ -74,9 +74,9 @@ class TranslationFileGenerator
 
         return match ($structure) {
             'flat' => "{$basePath}/{$prefix}.php",
-            'nested' => "{$basePath}/{$prefix}/" . Str::snake($analysis['resource_name']) . '.php',
-            'panel-based' => "{$basePath}/{$prefix}/{$panelId}/" . Str::snake($analysis['resource_name']) . '.php',
-            default => "{$basePath}/{$prefix}/{$panelId}/" . Str::snake($analysis['resource_name']) . '.php',
+            'nested' => "{$basePath}/{$prefix}/".Str::snake($analysis['resource_name']).'.php',
+            'panel-based' => "{$basePath}/{$prefix}/{$panelId}/".Str::snake($analysis['resource_name']).'.php',
+            default => "{$basePath}/{$prefix}/{$panelId}/".Str::snake($analysis['resource_name']).'.php',
         };
     }
 

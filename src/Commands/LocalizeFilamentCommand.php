@@ -4,7 +4,6 @@ namespace MominAlZaraa\FilamentLocalization\Commands;
 
 use Filament\Facades\Filament;
 use Illuminate\Console\Command;
-use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Process;
 use MominAlZaraa\FilamentLocalization\Services\GitService;
 use MominAlZaraa\FilamentLocalization\Services\LocalizationService;
@@ -218,7 +217,7 @@ class LocalizeFilamentCommand extends Command
 
         $progressBar->finish();
         $this->newLine(2);
-        
+
         // Increment panel processed counter
         $this->statisticsService->incrementPanelsProcessed();
     }

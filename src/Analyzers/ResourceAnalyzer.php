@@ -309,7 +309,7 @@ class ResourceAnalyzer
                 $content = File::get($filePath);
 
                 // Look for relation manager references
-                preg_match_all("/([A-Za-z]+RelationManager)::class/", $content, $matches);
+                preg_match_all('/([A-Za-z]+RelationManager)::class/', $content, $matches);
 
                 if (! empty($matches[1])) {
                     foreach ($matches[1] as $relationManager) {
@@ -334,9 +334,9 @@ class ResourceAnalyzer
         // or to the end of the components array (closing bracket/paren)
 
         // First, find the make() call for this field
-        $makePattern = "/{$component}::make\(['\"]" . preg_quote($fieldName, '/') . "['\"]\)/";
+        $makePattern = "/{$component}::make\(['\"]".preg_quote($fieldName, '/')."['\"]\)/";
 
-        if (!preg_match($makePattern, $content, $matches, PREG_OFFSET_CAPTURE)) {
+        if (! preg_match($makePattern, $content, $matches, PREG_OFFSET_CAPTURE)) {
             return false;
         }
 
@@ -422,7 +422,7 @@ class ResourceAnalyzer
             preg_match_all('/use\s+([^;]+);/', $content, $useMatches);
 
             foreach ($useMatches[1] as $useStatement) {
-                if (Str::endsWith($useStatement, '\\' . $schemaClass) || $useStatement === $schemaClass) {
+                if (Str::endsWith($useStatement, '\\'.$schemaClass) || $useStatement === $schemaClass) {
                     $schemaClass = $useStatement;
                     break;
                 }
@@ -439,7 +439,7 @@ class ResourceAnalyzer
             // If still not resolved, assume it's in the same namespace as the resource
             if (! Str::contains($schemaClass, '\\')) {
                 $resourceNamespace = (new ReflectionClass($resourceClass))->getNamespaceName();
-                $schemaClass = $resourceNamespace . '\\' . $schemaClass;
+                $schemaClass = $resourceNamespace.'\\'.$schemaClass;
             }
         }
 

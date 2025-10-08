@@ -3,10 +3,9 @@
 namespace MominAlZaraa\FilamentLocalization\Services;
 
 use Illuminate\Support\Facades\File;
-use Illuminate\Support\Str;
 use MominAlZaraa\FilamentLocalization\Analyzers\ResourceAnalyzer;
-use MominAlZaraa\FilamentLocalization\Generators\TranslationFileGenerator;
 use MominAlZaraa\FilamentLocalization\Generators\ResourceModifier;
+use MominAlZaraa\FilamentLocalization\Generators\TranslationFileGenerator;
 
 class LocalizationService
 {
@@ -18,7 +17,7 @@ class LocalizationService
 
     protected StatisticsService $statistics;
 
-    public function __construct(StatisticsService $statistics = null)
+    public function __construct(?StatisticsService $statistics = null)
     {
         $this->analyzer = new ResourceAnalyzer;
         $this->translationGenerator = new TranslationFileGenerator;
