@@ -1,0 +1,81 @@
+{
+    "name": "mominalzaraa/filament-localization",
+    "description": "Automatically scan and localize Filament resources with structured translation files",
+    "version": "1.0.0",
+    "keywords": [
+        "filament",
+        "laravel",
+        "localization",
+        "translation",
+        "i18n",
+        "multilingual"
+    ],
+    "homepage": "https://github.com/MominAlZaraa/filament-localization",
+    "license": "MIT",
+    "authors": [
+        {
+            "name": "Momin Al Zaraa",
+            "email": "support@mominpert.com",
+            "homepage": "https://mominpert.com",
+            "role": "Developer"
+        }
+    ],
+    "require": {
+        "php": "^8.2|^8.3|^8.4",
+        "laravel/framework": "^12.0",
+        "filament/filament": "^4.0",
+        "spatie/laravel-package-tools": "^1.16"
+    },
+    "require-dev": {
+        "laravel/pint": "^1.0",
+        "nunomaduro/collision": "^8.0",
+        "orchestra/testbench": "^10.0",
+        "pestphp/pest": "^3.0",
+        "pestphp/pest-plugin-laravel": "^3.0",
+        "phpstan/phpstan": "^1.10"
+    },
+    "autoload": {
+        "psr-4": {
+            "MominAlZaraa\\FilamentLocalization\\": "src/"
+        }
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "MominAlZaraa\\FilamentLocalization\\Tests\\": "tests/"
+        }
+    },
+    "scripts": {
+        "post-autoload-dump": "@composer run prepare",
+        "clear": "@php vendor/bin/testbench package:purge-filament-localization --ansi",
+        "prepare": "@php vendor/bin/testbench package:discover --ansi",
+        "build": [
+            "@composer run prepare",
+            "@php vendor/bin/testbench workbench:build --ansi"
+        ],
+        "start": [
+            "Composer\\Config::disableProcessTimeout",
+            "@composer run build",
+            "@php vendor/bin/testbench serve"
+        ],
+        "analyse": "vendor/bin/phpstan analyse",
+        "test": "vendor/bin/pest",
+        "test-coverage": "vendor/bin/pest --coverage",
+        "format": "vendor/bin/pint"
+    },
+    "config": {
+        "sort-packages": true,
+        "allow-plugins": {
+            "pestphp/pest-plugin": true,
+            "phpstan/extension-installer": true
+        }
+    },
+    "extra": {
+        "laravel": {
+            "providers": [
+                "MominAlZaraa\\FilamentLocalization\\FilamentLocalizationServiceProvider"
+            ]
+        }
+    },
+    "minimum-stability": "dev",
+    "prefer-stable": true
+}
