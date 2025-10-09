@@ -271,6 +271,135 @@ Do you want to proceed with localization? (yes/no) [yes]:
 4. **Resource Modification**: Updates resource files to use translation keys
 5. **Git Commit**: Creates a commit for easy reverting if needed
 
+## Language Switching Integration
+
+To make the localization work in your Filament panels, you need to integrate a language switching plugin. This package generates the translation files, but you'll need a way for users to switch between languages in the Filament interface.
+
+### Recommended Language Switcher Plugins
+
+#### Option 1: craft-forge/filament-language-switcher (Recommended)
+
+Install the language switcher plugin:
+
+```bash
+composer require craft-forge/filament-language-switcher
+```
+
+Add the plugin to your panel provider:
+
+```php
+// app/Providers/Filament/AdminPanelProvider.php
+use CraftForge\FilamentLanguageSwitcher\FilamentLanguageSwitcherPlugin;
+
+public function panel(Panel $panel): Panel
+{
+    return $panel
+        ->plugins([
+            FilamentLanguageSwitcherPlugin::make()
+                ->locales([
+                    ['code' => 'en', 'name' => 'English', 'flag' => 'gb'],
+                    ['code' => 'el', 'name' => 'Greek', 'flag' => 'gr'],
+                    ['code' => 'fr', 'name' => 'French', 'flag' => 'fr'],
+                    // Add more locales as needed
+                ]),
+        ]);
+}
+```
+
+#### Option 2: Other Language Switcher Plugins
+
+You can also use other language switching plugins such as:
+- `filament/spatie-laravel-translatable-plugin`
+- `awcodes/filament-language-switcher`
+- Custom language switcher implementations
+
+### Configuration Steps
+
+1. **Install a language switcher plugin** (see options above)
+2. **Configure the plugin** in your panel provider with the same locales you used in the localization command
+3. **Ensure Laravel's locale is set** properly in your application
+4. **Test the language switching** to verify translations are working
+
+### Example Panel Provider Configuration
+
+```php
+// app/Providers/Filament/AdminPanelProvider.php
+<?php
+
+namespace App\Providers\Filament;
+
+use Filament\Http\Middleware\Authenticate;
+use Filament\Http\Middleware\DisableBladeIconComponents;
+use Filament\Http\Middleware\DispatchServingFilamentEvent;
+use Filament\Pages;
+use Filament\Panel;
+use Filament\PanelProvider;
+use Filament\Support\Colors\Color;
+use Filament\Widgets;
+use Illuminate\Cookie\Middleware\AddQueuedCookiesToResponse;
+use Illuminate\Cookie\Middleware\EncryptCookies;
+use Illuminate\Foundation\Http\Middleware\VerifyCsrfToken;
+use Illuminate\Routing\Middleware\SubstituteBindings;
+use Illuminate\Session\Middleware\AuthenticateSession;
+use Illuminate\Session\Middleware\StartSession;
+use Illuminate\View\Middleware\ShareErrorsFromSession;
+use CraftForge\FilamentLanguageSwitcher\FilamentLanguageSwitcherPlugin;
+
+class AdminPanelProvider extends PanelProvider
+{
+    public function panel(Panel $panel): Panel
+    {
+        return $panel
+            ->default()
+            ->id('admin')
+            ->path('admin')
+            ->login()
+            ->colors([
+                'primary' => Color::Amber,
+            ])
+            ->discoverResources(in: app_path('Filament/Resources'), for: 'App\\Filament\\Resources')
+            ->discoverPages(in: app_path('Filament/Pages'), for: 'App\\Filament\\Pages')
+            ->pages([
+                Pages\Dashboard::class,
+            ])
+            ->discoverWidgets(in: app_path('Filament/Widgets'), for: 'App\\Filament\\Widgets')
+            ->widgets([
+                Widgets\AccountWidget::class,
+                Widgets\FilamentInfoWidget::class,
+            ])
+            ->middleware([
+                EncryptCookies::class,
+                AddQueuedCookiesToResponse::class,
+                StartSession::class,
+                AuthenticateSession::class,
+                ShareErrorsFromSession::class,
+                VerifyCsrfToken::class,
+                SubstituteBindings::class,
+                DisableBladeIconComponents::class,
+                DispatchServingFilamentEvent::class,
+            ])
+            ->authMiddleware([
+                Authenticate::class,
+            ])
+            ->plugins([
+                FilamentLanguageSwitcherPlugin::make()
+                    ->locales([
+                        ['code' => 'en', 'name' => 'English', 'flag' => 'gb'],
+                        ['code' => 'el', 'name' => 'Greek', 'flag' => 'gr'],
+                        ['code' => 'fr', 'name' => 'French', 'flag' => 'fr'],
+                    ]),
+            ]);
+    }
+}
+```
+
+### Important Notes
+
+- **Locale Consistency**: Ensure the locale codes in your language switcher match the locales you generated with the localization command
+- **Laravel Locale**: The language switcher will change Laravel's application locale, which will automatically load the correct translation files
+- **Session Persistence**: Most language switcher plugins will persist the selected language in the user's session
+- **Fallback Locale**: Make sure your `config/app.php` has a proper fallback locale configured
+
 ## Before and After
 
 ### Visual Comparison
@@ -451,3 +580,9 @@ A: Yes, but we recommend testing in a development environment first and using th
 
 **Q: Do I need to install Filament separately?**  
 A: No, the package automatically installs Filament and all required dependencies when you run `composer require mominalzaraa/filament-localization`.
+
+**Q: How do I enable language switching in my Filament panels?**  
+A: This package only generates the translation files. You need to install a language switcher plugin like `craft-forge/filament-language-switcher` and configure it in your panel provider to allow users to switch between languages.
+
+**Q: Can I use any language switcher plugin?**  
+A: Yes, you can use any Filament language switcher plugin that changes Laravel's application locale. Popular options include `craft-forge/filament-language-switcher`, `filament/spatie-laravel-translatable-plugin`, or `awcodes/filament-language-switcher`.
