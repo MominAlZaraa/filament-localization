@@ -83,6 +83,9 @@ class RelationManagerAnalyzer
             'sections' => [],
             'filters' => [],
             'has_custom_content' => false,
+            'labels' => [],
+            'navigation' => [],
+            'titles' => [],
         ];
 
         // Check if this relation manager has custom content that needs localization
@@ -106,6 +109,11 @@ class RelationManagerAnalyzer
 
         // Analyze filters
         $analysis['filters'] = $this->analyzeFilters($content);
+
+        // Analyze labels, navigation, and titles
+        $analysis['labels'] = $this->analyzeLabels($content);
+        $analysis['navigation'] = $this->analyzeNavigation($content);
+        $analysis['titles'] = $this->analyzeTitles($content);
 
         return $analysis;
     }
@@ -353,5 +361,83 @@ class RelationManagerAnalyzer
     protected function generateTranslationKey(string $fieldName): string
     {
         return Str::snake($fieldName);
+    }
+
+    protected function analyzeLabels(string $content): array
+    {
+        $labels = [];
+
+        // Check for existing static getTitle method (RelationManager uses static getTitle)
+        $labelMethods = [
+            'getTitle' => 'title',
+        ];
+
+        foreach ($labelMethods as $method => $type) {
+            if (preg_match('/public\s+static\s+function\s+' . $method . '\s*\([^)]*\)\s*:\s*string\s*{[^}]*return\s+[\'"]([^\'"]+)[\'"]/', $content, $matches)) {
+                $labels[] = [
+                    'method' => $method,
+                    'type' => $type,
+                    'value' => $matches[1],
+                    'has_translation' => str_contains($matches[1], '__('),
+                    'translation_key' => $this->generateTranslationKey($type),
+                    'is_static' => true,
+                ];
+            }
+        }
+
+        return $labels;
+    }
+
+    protected function analyzeNavigation(string $content): array
+    {
+        $navigation = [];
+
+        // Check for navigation-related properties and methods
+        $navigationMethods = [
+            'getNavigationLabel' => 'navigation_label',
+            'getNavigationIcon' => 'navigation_icon',
+            'getNavigationSort' => 'navigation_sort',
+            'getNavigationGroup' => 'navigation_group',
+            'getNavigationBadge' => 'navigation_badge',
+        ];
+
+        foreach ($navigationMethods as $method => $type) {
+            if (preg_match('/public\s+(?:static\s+)?function\s+' . $method . '\s*\([^)]*\)\s*:\s*[^{]*{[^}]*return\s+[\'"]([^\'"]+)[\'"]/', $content, $matches)) {
+                $navigation[] = [
+                    'method' => $method,
+                    'type' => $type,
+                    'value' => $matches[1],
+                    'has_translation' => str_contains($matches[1], '__('),
+                    'translation_key' => $this->generateTranslationKey($type),
+                ];
+            }
+        }
+
+        return $navigation;
+    }
+
+    protected function analyzeTitles(string $content): array
+    {
+        $titles = [];
+
+        // Check for static title properties (RelationManager has $title property)
+        $titleProperties = [
+            'title' => 'title',
+        ];
+
+        foreach ($titleProperties as $property => $type) {
+            if (preg_match('/protected\s+static\s+\?string\s+\$' . $property . '\s*=\s*[\'"]([^\'"]+)[\'"]/', $content, $matches)) {
+                $titles[] = [
+                    'property' => $property,
+                    'type' => $type,
+                    'value' => $matches[1],
+                    'has_translation' => str_contains($matches[1], '__('),
+                    'translation_key' => $this->generateTranslationKey($type),
+                    'is_static' => true,
+                ];
+            }
+        }
+
+        return $titles;
     }
 }

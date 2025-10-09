@@ -73,6 +73,21 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Code Formatting
+    |--------------------------------------------------------------------------
+    |
+    | Run Laravel Pint to format code before creating git commit.
+    | This ensures consistent code style across the project.
+    |
+    */
+
+    'pint' => [
+        'enabled' => true,
+        'command' => 'vendor/bin/pint --dirty',
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
     | Excluded Panels
     |--------------------------------------------------------------------------
     |

@@ -7,6 +7,7 @@ use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Process;
 use MominAlZaraa\FilamentLocalization\Services\GitService;
 use MominAlZaraa\FilamentLocalization\Services\LocalizationService;
+use MominAlZaraa\FilamentLocalization\Services\PintService;
 use MominAlZaraa\FilamentLocalization\Services\StatisticsService;
 
 class LocalizeFilamentCommand extends Command
@@ -26,6 +27,8 @@ class LocalizeFilamentCommand extends Command
 
     protected GitService $gitService;
 
+    protected PintService $pintService;
+
     public function __construct()
     {
         parent::__construct();
@@ -33,6 +36,7 @@ class LocalizeFilamentCommand extends Command
         $this->statisticsService = new StatisticsService;
         $this->localizationService = new LocalizationService($this->statisticsService);
         $this->gitService = new GitService;
+        $this->pintService = new PintService;
     }
 
     public function handle(): int
@@ -548,6 +552,21 @@ class LocalizeFilamentCommand extends Command
         $this->info('📝 Creating git commit...');
 
         try {
+            // Run Pint code formatting if enabled
+            if (config('filament-localization.pint.enabled', true)) {
+                $this->info('🎨 Running Laravel Pint for code formatting...');
+                $pintResult = $this->pintService->formatCodeWithOutput();
+                
+                if ($pintResult['success']) {
+                    $this->info('✅ Code formatted successfully!');
+                    if (!empty($pintResult['output'])) {
+                        $this->line($pintResult['output']);
+                    }
+                } else {
+                    $this->warn('⚠️  Pint formatting failed: ' . $pintResult['error']);
+                }
+            }
+
             $commitMessage = config('filament-localization.git.commit_message');
             $this->gitService->createCommit($commitMessage);
 

@@ -43,6 +43,14 @@ class PageModifier
         // Modify custom content
         $content = $this->modifyCustomContent($content, $analysis['custom_content'], $analysis, $panel);
 
+        // Modify labels, navigation, and titles
+        $content = $this->modifyLabels($content, $analysis['labels'], $analysis, $panel);
+        $content = $this->modifyNavigation($content, $analysis['navigation'], $analysis, $panel);
+        $content = $this->modifyTitles($content, $analysis['titles'], $analysis, $panel);
+
+        // Add missing label methods if needed
+        $content = $this->addMissingLabelMethods($content, $analysis, $panel);
+
         // Only write if content changed
         if ($content !== $originalContent) {
             File::put($filePath, $content);
@@ -184,6 +192,96 @@ class PageModifier
             'panel-based' => "{$prefix}/{$panel->getId()}/".Str::snake($analysis['page_name']).".{$key}",
             default => "{$prefix}/{$panel->getId()}/".Str::snake($analysis['page_name']).".{$key}",
         };
+    }
+
+    protected function modifyLabels(string $content, array $labels, array $analysis, $panel): string
+    {
+        foreach ($labels as $label) {
+            if ($label['has_translation']) {
+                continue; // Already has translation
+            }
+
+            $translationKey = $this->buildTranslationKey($analysis, $panel, $label['translation_key']);
+            $escapedValue = preg_quote($label['value'], '/');
+
+            // Replace hardcoded values with translation keys
+            $pattern = '/return\s+[\'"]' . $escapedValue . '[\'"]/';
+            $replacement = "return __('$translationKey')";
+
+            $content = preg_replace($pattern, $replacement, $content, 1);
+        }
+
+        return $content;
+    }
+
+    protected function modifyNavigation(string $content, array $navigation, array $analysis, $panel): string
+    {
+        foreach ($navigation as $nav) {
+            if ($nav['has_translation']) {
+                continue; // Already has translation
+            }
+
+            $translationKey = $this->buildTranslationKey($analysis, $panel, $nav['translation_key']);
+            $escapedValue = preg_quote($nav['value'], '/');
+
+            // Replace hardcoded values with translation keys
+            $pattern = '/return\s+[\'"]' . $escapedValue . '[\'"]/';
+            $replacement = "return __('$translationKey')";
+
+            $content = preg_replace($pattern, $replacement, $content, 1);
+        }
+
+        return $content;
+    }
+
+    protected function modifyTitles(string $content, array $titles, array $analysis, $panel): string
+    {
+        foreach ($titles as $title) {
+            if ($title['has_translation']) {
+                continue; // Already has translation
+            }
+
+            $translationKey = $this->buildTranslationKey($analysis, $panel, $title['translation_key']);
+            $escapedValue = preg_quote($title['value'], '/');
+
+            // Replace hardcoded values with translation keys
+            $pattern = '/protected\s+static\s+\?string\s+\$' . $title['property'] . '\s*=\s*[\'"]' . $escapedValue . '[\'"]/';
+            $replacement = "protected static ?string \$" . $title['property'] . " = __('$translationKey')";
+
+            $content = preg_replace($pattern, $replacement, $content, 1);
+        }
+
+        return $content;
+    }
+
+    protected function addMissingLabelMethods(string $content, array $analysis, $panel): string
+    {
+        $pageName = $analysis['page_name'];
+        $translationKey = $this->buildTranslationKey($analysis, $panel, 'title');
+
+        // Check if getTitle method exists (non-static for pages)
+        if (!preg_match('/public\s+function\s+getTitle\s*\(/', $content)) {
+            // Add getTitle method before the closing brace
+            $pattern = '/(\n\s*}\s*)$/';
+            if (preg_match($pattern, $content, $matches, PREG_OFFSET_CAPTURE)) {
+                $insertPosition = $matches[0][1];
+                $method = "\n    public function getTitle(): string\n    {\n        return __('$translationKey');\n    }\n";
+                $content = substr_replace($content, $method, $insertPosition, 0);
+            }
+        }
+
+        // Also add static $title property if it doesn't exist
+        if (!preg_match('/protected\s+static\s+\?string\s+\$title/', $content)) {
+            // Add static $title property after the class declaration
+            $pattern = '/(class\s+\w+[^{]*{)/';
+            if (preg_match($pattern, $content, $matches, PREG_OFFSET_CAPTURE)) {
+                $insertPosition = $matches[0][1] + strlen($matches[0][0]);
+                $property = "\n\n    protected static ?string \$title = null;\n";
+                $content = substr_replace($content, $property, $insertPosition, 0);
+            }
+        }
+
+        return $content;
     }
 
     protected function createBackup(string $filePath): void

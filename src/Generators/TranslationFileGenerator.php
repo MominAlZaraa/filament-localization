@@ -297,6 +297,34 @@ class TranslationFileGenerator
             $translations[$item['translation_key']] = $item['content'];
         }
 
+        // Add label translations
+        foreach ($analysis['labels'] as $label) {
+            if (!$label['has_translation']) {
+                $translations[$label['translation_key']] = $label['value'];
+            }
+        }
+
+        // Add navigation translations
+        foreach ($analysis['navigation'] as $nav) {
+            if (!$nav['has_translation']) {
+                $translations[$nav['translation_key']] = $nav['value'];
+            }
+        }
+
+        // Add title translations
+        foreach ($analysis['titles'] as $title) {
+            if (!$title['has_translation']) {
+                $translations[$title['translation_key']] = $title['value'];
+            }
+        }
+
+        // Add default title if no title exists
+        if (empty($analysis['labels']) && empty($analysis['titles'])) {
+            $pageName = $analysis['page_name'];
+            $defaultTitle = $this->generateDefaultTitle($pageName);
+            $translations['title'] = $defaultTitle;
+        }
+
         return $translations;
     }
 
@@ -337,7 +365,48 @@ class TranslationFileGenerator
             }
         }
 
+        // Add label translations
+        foreach ($analysis['labels'] as $label) {
+            if (!$label['has_translation']) {
+                $translations[$label['translation_key']] = $label['value'];
+            }
+        }
+
+        // Add navigation translations
+        foreach ($analysis['navigation'] as $nav) {
+            if (!$nav['has_translation']) {
+                $translations[$nav['translation_key']] = $nav['value'];
+            }
+        }
+
+        // Add title translations
+        foreach ($analysis['titles'] as $title) {
+            if (!$title['has_translation']) {
+                $translations[$title['translation_key']] = $title['value'];
+            }
+        }
+
+        // Add default title if no title exists
+        if (empty($analysis['labels']) && empty($analysis['titles'])) {
+            $relationManagerName = $analysis['relation_manager_name'];
+            $defaultTitle = $this->generateDefaultTitle($relationManagerName);
+            $translations['title'] = $defaultTitle;
+        }
+
         return $translations;
+    }
+
+    protected function generateDefaultTitle(string $name): string
+    {
+        // Remove common suffixes
+        $title = preg_replace('/Resource$/', '', $name);
+        $title = preg_replace('/RelationManager$/', '', $title);
+        $title = preg_replace('/Page$/', '', $title);
+
+        // Convert PascalCase to words with spaces
+        $title = preg_replace('/([a-z])([A-Z])/', '$1 $2', $title);
+
+        return $title;
     }
 
     protected function generatePhpArrayContent(array $translations): string
