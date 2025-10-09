@@ -111,7 +111,7 @@ class LocalizeFilamentCommand extends Command
         $this->newLine();
         $this->line('╔════════════════════════════════════════════════════════════════╗');
         $this->line('║                                                                ║');
-        $this->line('║          Filament Localization Package ' . str_pad($version, 20) . ' ║');
+        $this->line('║          Filament Localization Package '.str_pad($version, 20).' ║');
         $this->line('║                                                                ║');
         $this->line('║  Automatically scan and localize Filament resources            ║');
         $this->line('║                                                                ║');
@@ -137,6 +137,7 @@ class LocalizeFilamentCommand extends Command
             $composerPath = base_path('vendor/mominalzaraa/filament-localization/composer.json');
             if (file_exists($composerPath)) {
                 $composer = json_decode(file_get_contents($composerPath), true);
+
                 return $composer['version'] ?? 'dev';
             }
         } catch (\Exception $e) {
