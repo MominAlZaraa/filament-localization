@@ -316,9 +316,9 @@ class RelationManagerModifier
             $translationKey = $this->buildTranslationKey($analysis, $panel, $title['translation_key']);
             $escapedValue = preg_quote($title['value'], '/');
 
-            // Replace hardcoded values with translation keys
+            // Replace hardcoded values with null (we'll use getTitle() method instead)
             $pattern = '/protected\s+static\s+\?string\s+\$' . $title['property'] . '\s*=\s*[\'"]' . $escapedValue . '[\'"]/';
-            $replacement = "protected static ?string \$" . $title['property'] . " = __('$translationKey')";
+            $replacement = "protected static ?string \$" . $title['property'] . " = null";
 
             $content = preg_replace($pattern, $replacement, $content, 1);
         }
@@ -336,8 +336,9 @@ class RelationManagerModifier
             // Add Model import if not already present
             if (!preg_match('/use\s+Illuminate\\\\Database\\\\Eloquent\\\\Model;/', $content)) {
                 // Find the last use statement and add Model import after it
-                if (preg_match('/(use\s+[^;]+;)\s*$/', $content, $matches, PREG_OFFSET_CAPTURE)) {
-                    $insertPosition = $matches[0][1] + strlen($matches[0][0]);
+                if (preg_match_all('/use\s+[^;]+;/', $content, $matches, PREG_OFFSET_CAPTURE)) {
+                    $lastUseStatement = end($matches[0]);
+                    $insertPosition = $lastUseStatement[1] + strlen($lastUseStatement[0]);
                     $import = "\nuse Illuminate\\Database\\Eloquent\\Model;";
                     $content = substr_replace($content, $import, $insertPosition, 0);
                 }

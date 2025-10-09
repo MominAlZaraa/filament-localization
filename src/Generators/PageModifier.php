@@ -244,9 +244,9 @@ class PageModifier
             $translationKey = $this->buildTranslationKey($analysis, $panel, $title['translation_key']);
             $escapedValue = preg_quote($title['value'], '/');
 
-            // Replace hardcoded values with translation keys
+            // Replace hardcoded values with null (we'll use getTitle() method instead)
             $pattern = '/protected\s+static\s+\?string\s+\$' . $title['property'] . '\s*=\s*[\'"]' . $escapedValue . '[\'"]/';
-            $replacement = "protected static ?string \$" . $title['property'] . " = __('$translationKey')";
+            $replacement = "protected static ?string \$" . $title['property'] . " = null";
 
             $content = preg_replace($pattern, $replacement, $content, 1);
         }
