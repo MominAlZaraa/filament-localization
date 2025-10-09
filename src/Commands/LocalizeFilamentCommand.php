@@ -132,10 +132,10 @@ class LocalizeFilamentCommand extends Command
         // If specific panels are requested
         if ($this->option('panel')) {
             $requestedPanels = $this->option('panel');
-            $panels = $allPanels->filter(fn ($panel) => in_array($panel->getId(), $requestedPanels));
+            $panels = $allPanels->filter(fn($panel) => in_array($panel->getId(), $requestedPanels));
 
             if ($panels->isEmpty()) {
-                $this->error('❌ No matching panels found for: '.implode(', ', $requestedPanels));
+                $this->error('❌ No matching panels found for: ' . implode(', ', $requestedPanels));
 
                 return [];
             }
@@ -145,7 +145,7 @@ class LocalizeFilamentCommand extends Command
 
         // Filter out excluded panels
         $excludedPanels = config('filament-localization.excluded_panels', []);
-        $panels = $allPanels->filter(fn ($panel) => ! in_array($panel->getId(), $excludedPanels));
+        $panels = $allPanels->filter(fn($panel) => ! in_array($panel->getId(), $excludedPanels));
 
         return $panels->all();
     }
@@ -161,7 +161,7 @@ class LocalizeFilamentCommand extends Command
 
     protected function confirmProcessing(array $panels, array $locales): bool
     {
-        $panelNames = collect($panels)->map(fn ($panel) => $panel->getId())->implode(', ');
+        $panelNames = collect($panels)->map(fn($panel) => $panel->getId())->implode(', ');
 
         $this->table(
             ['Setting', 'Value'],
@@ -191,22 +191,83 @@ class LocalizeFilamentCommand extends Command
 
         // Get all resources for this panel
         $resources = $panel->getResources();
+        $pages = $this->getPanelPages($panel);
+        $relationManagers = $this->getPanelRelationManagers($panel);
 
-        if (empty($resources)) {
-            $this->warn("  ⚠️  No resources found in panel: {$panelId}");
+        // Calculate total items including resource pages
+        $totalItems = count($resources) + count($pages) + count($relationManagers);
+        $resourcePagesCount = 0;
+        foreach ($resources as $resource) {
+            $resourcePages = $this->getResourcePages($resource);
+            $resourcePagesCount += count($resourcePages);
+            $totalItems += count($resourcePages);
+        }
+
+        // $this->info("Found {$resourcePagesCount} resource pages to process");
+
+        if ($totalItems === 0) {
+            $this->warn("  ⚠️  No resources, pages, or relation managers found in panel: {$panelId}");
 
             return;
         }
 
-        $progressBar = $this->output->createProgressBar(count($resources));
+        $progressBar = $this->output->createProgressBar($totalItems);
         $progressBar->setFormat(' %current%/%max% [%bar%] %percent:3s%% - %message%');
 
+        // Process resources
         foreach ($resources as $resource) {
             $resourceName = class_basename($resource);
-            $progressBar->setMessage("Processing {$resourceName}...");
+            $progressBar->setMessage("Processing resource {$resourceName}...");
 
             $this->localizationService->processResource(
                 $resource,
+                $panel,
+                $locales,
+                $this->option('dry-run')
+            );
+
+            // Also process resource pages
+            $resourcePages = $this->getResourcePages($resource);
+
+            foreach ($resourcePages as $page) {
+                $pageName = class_basename($page);
+                $progressBar->setMessage("Processing resource page {$pageName}...");
+
+                $this->localizationService->processPage(
+                    $page,
+                    $panel,
+                    $locales,
+                    $this->option('dry-run')
+                );
+
+                $progressBar->advance();
+            }
+
+            $progressBar->advance();
+        }
+
+        // Process pages
+        foreach ($pages as $page) {
+            $pageName = class_basename($page);
+            $progressBar->setMessage("Processing page {$pageName}...");
+
+            $this->localizationService->processPage(
+                $page,
+                $panel,
+                $locales,
+                $this->option('dry-run')
+            );
+
+            $progressBar->advance();
+        }
+
+        // Process relation managers
+        foreach ($relationManagers as $relationManager) {
+            $relationManagerName = class_basename($relationManager);
+            $progressBar->setMessage("Processing relation manager {$relationManagerName}...");
+
+            $this->localizationService->processRelationManager(
+                $relationManager,
                 $panel,
                 $locales,
                 $this->option('dry-run')
@@ -254,6 +315,233 @@ class LocalizeFilamentCommand extends Command
         }
     }
 
+    protected function getPanelPages($panel): array
+    {
+        $pages = [];
+
+        try {
+            // Get pages from the panel
+            $panelPages = $panel->getPages();
+
+            foreach ($panelPages as $page) {
+                // Only include pages that are not default Filament pages
+                if ($this->isCustomPage($page)) {
+                    $pages[] = $page;
+                }
+            }
+        } catch (\Exception $e) {
+            // Silently fail if we can't get pages
+        }
+
+        return $pages;
+    }
+
+    protected function getResourcePages(string $resourceClass): array
+    {
+        $pages = [];
+
+        try {
+            $reflection = new \ReflectionClass($resourceClass);
+            $filePath = $reflection->getFileName();
+
+            if ($filePath && \File::exists($filePath)) {
+                $content = \File::get($filePath);
+
+                // Look for page references in the resource use statements
+                // Extract use statements and find Pages
+                preg_match_all('/use\s+([^;]+);/', $content, $useMatches);
+
+                foreach ($useMatches[1] as $useStatement) {
+                    if (str_contains($useStatement, 'Pages\\')) {
+                        // Extract the page class name
+                        // Extract page name using string functions instead of regex
+                        $parts = explode('\\', $useStatement);
+                        $pageName = end($parts);
+                        $fullClassName = $useStatement; // Use the full use statement as class name
+
+                        if ($this->isCustomPage($fullClassName)) {
+                            $pages[] = $fullClassName;
+                        }
+                    }
+                }
+            }
+        } catch (\Exception $e) {
+            // Silently fail if we can't analyze the resource
+        }
+
+        return $pages;
+    }
+
+    protected function resolvePageClass(string $pageClass, string $resourceClass, string $content): ?string
+    {
+        // If the class name doesn't have a namespace, we need to resolve it from the use statements
+        if (! str_contains($pageClass, '\\')) {
+            // Extract use statements from the content
+            preg_match_all('/use\s+([^;]+);/', $content, $useMatches);
+
+            foreach ($useMatches[1] as $useStatement) {
+                if (str_ends_with($useStatement, '\\' . $pageClass) || $useStatement === $pageClass) {
+                    return $useStatement;
+                }
+
+                // Handle aliased imports (use X as Y)
+                if (preg_match('/(.+)\s+as\s+(.+)/', $useStatement, $aliasMatch)) {
+                    if (trim($aliasMatch[2]) === $pageClass) {
+                        return trim($aliasMatch[1]);
+                    }
+                }
+            }
+
+            // If still not resolved, assume it's in the same namespace as the resource
+            if (! str_contains($pageClass, '\\')) {
+                $resourceNamespace = (new \ReflectionClass($resourceClass))->getNamespaceName();
+                return $resourceNamespace . '\\Pages\\' . $pageClass;
+            }
+        }
+
+        return $pageClass;
+    }
+
+    protected function getPanelRelationManagers($panel): array
+    {
+        $relationManagers = [];
+
+        try {
+            // Get all resources for this panel
+            $resources = $panel->getResources();
+
+            foreach ($resources as $resource) {
+                // Try to get relation managers from each resource
+                $resourceRelationManagers = $this->getResourceRelationManagers($resource);
+                $relationManagers = array_merge($relationManagers, $resourceRelationManagers);
+            }
+        } catch (\Exception $e) {
+            // Silently fail if we can't get relation managers
+        }
+
+        return array_unique($relationManagers);
+    }
+
+    protected function getResourceRelationManagers(string $resourceClass): array
+    {
+        $relationManagers = [];
+
+        try {
+            $reflection = new \ReflectionClass($resourceClass);
+            $filePath = $reflection->getFileName();
+
+            if ($filePath && \File::exists($filePath)) {
+                $content = \File::get($filePath);
+
+                // Look for relation manager references
+                preg_match_all('/([A-Za-z]+RelationManager)::class/', $content, $matches);
+
+                if (! empty($matches[1])) {
+                    foreach ($matches[1] as $relationManager) {
+                        // Try to resolve the full class name
+                        $fullClassName = $this->resolveRelationManagerClass($relationManager, $resourceClass, $content);
+                        if ($fullClassName) {
+                            $relationManagers[] = $fullClassName;
+                        }
+                    }
+                }
+            }
+        } catch (\Exception $e) {
+            // Silently fail if we can't analyze the resource
+        }
+
+        return $relationManagers;
+    }
+
+    protected function resolveRelationManagerClass(string $relationManagerClass, string $resourceClass, string $content): ?string
+    {
+        // If the class name doesn't have a namespace, we need to resolve it from the use statements
+        if (! str_contains($relationManagerClass, '\\')) {
+            // Extract use statements from the content
+            preg_match_all('/use\s+([^;]+);/', $content, $useMatches);
+
+            foreach ($useMatches[1] as $useStatement) {
+                if (str_ends_with($useStatement, '\\' . $relationManagerClass) || $useStatement === $relationManagerClass) {
+                    return $useStatement;
+                }
+
+                // Handle aliased imports (use X as Y)
+                if (preg_match('/(.+)\s+as\s+(.+)/', $useStatement, $aliasMatch)) {
+                    if (trim($aliasMatch[2]) === $relationManagerClass) {
+                        return trim($aliasMatch[1]);
+                    }
+                }
+            }
+
+            // If still not resolved, assume it's in the same namespace as the resource
+            if (! str_contains($relationManagerClass, '\\')) {
+                $resourceNamespace = (new \ReflectionClass($resourceClass))->getNamespaceName();
+                return $resourceNamespace . '\\' . $relationManagerClass;
+            }
+        }
+
+        return $relationManagerClass;
+    }
+
+    protected function isCustomPage(string $pageClass): bool
+    {
+        try {
+            $reflection = new \ReflectionClass($pageClass);
+            $filePath = $reflection->getFileName();
+
+            if (! $filePath || ! \File::exists($filePath)) {
+                return false;
+            }
+
+            $content = \File::get($filePath);
+
+            // Check if this page has custom content that needs localization
+            $patterns = [
+                // Infolist entries
+                '/TextEntry::make\(/',
+                '/IconEntry::make\(/',
+                '/ImageEntry::make\(/',
+                '/ColorEntry::make\(/',
+                '/KeyValueEntry::make\(/',
+                '/RepeatableEntry::make\(/',
+
+                // Custom actions
+                '/Action::make\(/',
+                '/CreateAction::make\(/',
+                '/EditAction::make\(/',
+                '/DeleteAction::make\(/',
+                '/ViewAction::make\(/',
+                '/BulkAction::make\(/',
+
+                // Custom sections
+                '/Section::make\(/',
+                '/Fieldset::make\(/',
+                '/Grid::make\(/',
+                '/Tabs::make\(/',
+                '/Wizard::make\(/',
+
+                // Custom labels and titles
+                '/->label\([\'"][^\'"]+[\'"]\)/',
+                '/->title\([\'"][^\'"]+[\'"]\)/',
+                '/->heading\([\'"][^\'"]+[\'"]\)/',
+
+                // Custom HTML content
+                '/->html\(/',
+                '/->state\(/',
+            ];
+
+            foreach ($patterns as $pattern) {
+                if (preg_match($pattern, $content)) {
+                    return true;
+                }
+            }
+
+            return false;
+        } catch (\Exception $e) {
+            return false;
+        }
+    }
+
     protected function createGitCommit(): void
     {
         $this->newLine();
@@ -266,7 +554,7 @@ class LocalizeFilamentCommand extends Command
             $this->info('✅ Git commit created successfully!');
             $this->info('💡 You can revert this commit using: git reset --soft HEAD~1');
         } catch (\Exception $e) {
-            $this->error('❌ Failed to create git commit: '.$e->getMessage());
+            $this->error('❌ Failed to create git commit: ' . $e->getMessage());
         }
     }
 }
