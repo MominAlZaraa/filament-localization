@@ -270,16 +270,8 @@ class PageModifier
             }
         }
 
-        // Also add static $title property if it doesn't exist
-        if (!preg_match('/protected\s+static\s+\?string\s+\$title/', $content)) {
-            // Add static $title property after the class declaration
-            $pattern = '/(class\s+\w+[^{]*{)/';
-            if (preg_match($pattern, $content, $matches, PREG_OFFSET_CAPTURE)) {
-                $insertPosition = $matches[0][1] + strlen($matches[0][0]);
-                $property = "\n\n    protected static ?string \$title = null;\n";
-                $content = substr_replace($content, $property, $insertPosition, 0);
-            }
-        }
+        // Note: We don't add static $title property as it can't contain function calls
+        // The getTitle() method will handle the translation
 
         return $content;
     }

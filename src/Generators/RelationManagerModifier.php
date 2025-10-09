@@ -333,6 +333,16 @@ class RelationManagerModifier
 
         // Check if static getTitle method exists (RelationManager uses static getTitle)
         if (!preg_match('/public\s+static\s+function\s+getTitle\s*\(/', $content)) {
+            // Add Model import if not already present
+            if (!preg_match('/use\s+Illuminate\\\\Database\\\\Eloquent\\\\Model;/', $content)) {
+                // Find the last use statement and add Model import after it
+                if (preg_match('/(use\s+[^;]+;)\s*$/', $content, $matches, PREG_OFFSET_CAPTURE)) {
+                    $insertPosition = $matches[0][1] + strlen($matches[0][0]);
+                    $import = "\nuse Illuminate\\Database\\Eloquent\\Model;";
+                    $content = substr_replace($content, $import, $insertPosition, 0);
+                }
+            }
+            
             // Add static getTitle method before the closing brace
             $pattern = '/(\n\s*}\s*)$/';
             if (preg_match($pattern, $content, $matches, PREG_OFFSET_CAPTURE)) {
@@ -342,16 +352,8 @@ class RelationManagerModifier
             }
         }
 
-        // Also add static $title property if it doesn't exist
-        if (!preg_match('/protected\s+static\s+\?string\s+\$title/', $content)) {
-            // Add static $title property after the class declaration
-            $pattern = '/(class\s+\w+[^{]*{)/';
-            if (preg_match($pattern, $content, $matches, PREG_OFFSET_CAPTURE)) {
-                $insertPosition = $matches[0][1] + strlen($matches[0][0]);
-                $property = "\n\n    protected static ?string \$title = null;\n";
-                $content = substr_replace($content, $property, $insertPosition, 0);
-            }
-        }
+        // Note: We don't add static $title property as it can't contain function calls
+        // The getTitle() method will handle the translation
 
         return $content;
     }
