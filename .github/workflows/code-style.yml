@@ -32,18 +32,33 @@ jobs:
       - name: Run Pint (Code Style Fixer)
         run: vendor/bin/pint
 
-      - name: Pull latest changes before committing
+      - name: Commit and push style fixes
         run: |
-          git config --local user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git config --local user.name "github-actions[bot]"
-          git pull origin main || true
-
-      - name: Commit style fixes
-        uses: stefanzweifel/git-auto-commit-action@v5
-        with:
-          commit_message: "style: fix code style issues"
-          skip_fetch: false
-          skip_checkout: false
+          # Configure git
+          git config --global user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git config --global user.name "github-actions[bot]"
+          
+          # Check if there are any changes to commit
+          if [ -n "$(git status --porcelain)" ]; then
+            echo "Changes detected, committing style fixes..."
+            
+            # Add all changes
+            git add .
+            
+            # Commit changes
+            git commit -m "style: fix code style issues" || echo "Nothing to commit"
+            
+            # Pull latest changes with rebase to handle conflicts
+            git pull --rebase origin main || {
+              echo "Rebase failed, trying merge instead..."
+              git pull origin main --no-rebase || true
+            }
+            
+            # Push changes
+            git push origin main
+          else
+            echo "No changes detected, skipping commit."
+          fi
         if: github.event_name == 'push'
 
       - name: Check if code style is correct
