@@ -12,6 +12,7 @@
         "php",
         "package"
     ],
+    "version": "1.0.3",
     "homepage": "https://github.com/MominAlZaraa/filament-localization",
     "readme": "README.md",
     "license": "MIT",

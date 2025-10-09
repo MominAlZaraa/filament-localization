@@ -106,10 +106,12 @@ class LocalizeFilamentCommand extends Command
 
     protected function displayWelcomeBanner(): void
     {
+        $version = $this->getPackageVersion();
+        
         $this->newLine();
         $this->line('╔════════════════════════════════════════════════════════════════╗');
         $this->line('║                                                                ║');
-        $this->line('║          Filament Localization Package v1.0.0                  ║');
+        $this->line('║          Filament Localization Package ' . str_pad($version, 20) . ' ║');
         $this->line('║                                                                ║');
         $this->line('║  Automatically scan and localize Filament resources            ║');
         $this->line('║                                                                ║');
@@ -127,6 +129,21 @@ class LocalizeFilamentCommand extends Command
         }
 
         $this->newLine();
+    }
+
+    protected function getPackageVersion(): string
+    {
+        try {
+            $composerPath = base_path('vendor/mominalzaraa/filament-localization/composer.json');
+            if (file_exists($composerPath)) {
+                $composer = json_decode(file_get_contents($composerPath), true);
+                return $composer['version'] ?? 'dev';
+            }
+        } catch (\Exception $e) {
+            // Fallback to dev if we can't read the version
+        }
+        
+        return 'dev';
     }
 
     protected function getPanelsToProcess(): array
@@ -172,9 +189,18 @@ class LocalizeFilamentCommand extends Command
             [
                 ['Panels to process', $panelNames],
                 ['Locales to generate', implode(', ', $locales)],
-                ['Structure', config('filament-localization.structure')],
+                ['Translation structure', config('filament-localization.structure', 'panel-based')],
+                ['Translation prefix', config('filament-localization.translation_key_prefix', 'filament')],
+                ['Label generation', config('filament-localization.label_generation', 'title_case')],
+                ['Preserve existing labels', config('filament-localization.preserve_existing_labels', false) ? 'Yes' : 'No'],
+                ['Create backups', config('filament-localization.backup', true) ? 'Yes' : 'No'],
+                ['Laravel Pint enabled', config('filament-localization.pint.enabled', true) ? 'Yes' : 'No'],
+                ['Pint command', config('filament-localization.pint.command', 'vendor/bin/pint --dirty')],
+                ['Git integration', config('filament-localization.git.enabled', true) ? 'Yes' : 'No'],
+                ['Git commit message', config('filament-localization.git.commit_message', 'chore: add Filament localization support')],
+                ['Excluded panels', implode(', ', config('filament-localization.excluded_panels', [])) ?: 'None'],
                 ['Dry run', $this->option('dry-run') ? 'Yes' : 'No'],
-                ['Git commit', (! $this->option('no-git') && config('filament-localization.git.enabled')) ? 'Yes' : 'No'],
+                ['Force mode', $this->option('force') ? 'Yes' : 'No'],
             ]
         );
 
