@@ -277,7 +277,7 @@ class RelationManagerModifier
             $escapedValue = preg_quote($label['value'], '/');
 
             // Replace hardcoded values with translation keys
-            $pattern = '/return\s+[\'"]' . $escapedValue . '[\'"]/';
+            $pattern = '/return\s+[\'"]'.$escapedValue.'[\'"]/';
             $replacement = "return __('$translationKey')";
 
             $content = preg_replace($pattern, $replacement, $content, 1);
@@ -297,7 +297,7 @@ class RelationManagerModifier
             $escapedValue = preg_quote($nav['value'], '/');
 
             // Replace hardcoded values with translation keys
-            $pattern = '/return\s+[\'"]' . $escapedValue . '[\'"]/';
+            $pattern = '/return\s+[\'"]'.$escapedValue.'[\'"]/';
             $replacement = "return __('$translationKey')";
 
             $content = preg_replace($pattern, $replacement, $content, 1);
@@ -317,8 +317,8 @@ class RelationManagerModifier
             $escapedValue = preg_quote($title['value'], '/');
 
             // Replace hardcoded values with null (we'll use getTitle() method instead)
-            $pattern = '/protected\s+static\s+\?string\s+\$' . $title['property'] . '\s*=\s*[\'"]' . $escapedValue . '[\'"]/';
-            $replacement = "protected static ?string \$" . $title['property'] . " = null";
+            $pattern = '/protected\s+static\s+\?string\s+\$'.$title['property'].'\s*=\s*[\'"]'.$escapedValue.'[\'"]/';
+            $replacement = 'protected static ?string $'.$title['property'].' = null';
 
             $content = preg_replace($pattern, $replacement, $content, 1);
         }
@@ -332,9 +332,9 @@ class RelationManagerModifier
         $translationKey = $this->buildTranslationKey($analysis, $panel, 'title');
 
         // Check if static getTitle method exists (RelationManager uses static getTitle)
-        if (!preg_match('/public\s+static\s+function\s+getTitle\s*\(/', $content)) {
+        if (! preg_match('/public\s+static\s+function\s+getTitle\s*\(/', $content)) {
             // Add Model import if not already present
-            if (!preg_match('/use\s+Illuminate\\\\Database\\\\Eloquent\\\\Model;/', $content)) {
+            if (! preg_match('/use\s+Illuminate\\\\Database\\\\Eloquent\\\\Model;/', $content)) {
                 // Find the last use statement and add Model import after it
                 if (preg_match_all('/use\s+[^;]+;/', $content, $matches, PREG_OFFSET_CAPTURE)) {
                     $lastUseStatement = end($matches[0]);
@@ -343,7 +343,7 @@ class RelationManagerModifier
                     $content = substr_replace($content, $import, $insertPosition, 0);
                 }
             }
-            
+
             // Add static getTitle method before the closing brace
             $pattern = '/(\n\s*}\s*)$/';
             if (preg_match($pattern, $content, $matches, PREG_OFFSET_CAPTURE)) {

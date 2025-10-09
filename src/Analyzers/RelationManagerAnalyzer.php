@@ -91,7 +91,7 @@ class RelationManagerAnalyzer
         // Check if this relation manager has custom content that needs localization
         $analysis['has_custom_content'] = $this->hasCustomContent($content);
 
-        if (!$analysis['has_custom_content']) {
+        if (! $analysis['has_custom_content']) {
             return $analysis;
         }
 
@@ -128,19 +128,19 @@ class RelationManagerAnalyzer
             '/Select::make\(/',
             '/DatePicker::make\(/',
             '/Checkbox::make\(/',
-            
+
             // Table columns
             '/TextColumn::make\(/',
             '/IconColumn::make\(/',
             '/ImageColumn::make\(/',
             '/CheckboxColumn::make\(/',
-            
+
             // Actions
             '/Action::make\(/',
             '/CreateAction::make\(/',
             '/EditAction::make\(/',
             '/DeleteAction::make\(/',
-            
+
             // Custom labels and titles
             '/->label\([\'"][^\'"]+[\'"]\)/',
             '/->title\([\'"][^\'"]+[\'"]\)/',
@@ -373,7 +373,7 @@ class RelationManagerAnalyzer
         ];
 
         foreach ($labelMethods as $method => $type) {
-            if (preg_match('/public\s+static\s+function\s+' . $method . '\s*\([^)]*\)\s*:\s*string\s*{[^}]*return\s+[\'"]([^\'"]+)[\'"]/', $content, $matches)) {
+            if (preg_match('/public\s+static\s+function\s+'.$method.'\s*\([^)]*\)\s*:\s*string\s*{[^}]*return\s+[\'"]([^\'"]+)[\'"]/', $content, $matches)) {
                 $labels[] = [
                     'method' => $method,
                     'type' => $type,
@@ -402,7 +402,7 @@ class RelationManagerAnalyzer
         ];
 
         foreach ($navigationMethods as $method => $type) {
-            if (preg_match('/public\s+(?:static\s+)?function\s+' . $method . '\s*\([^)]*\)\s*:\s*[^{]*{[^}]*return\s+[\'"]([^\'"]+)[\'"]/', $content, $matches)) {
+            if (preg_match('/public\s+(?:static\s+)?function\s+'.$method.'\s*\([^)]*\)\s*:\s*[^{]*{[^}]*return\s+[\'"]([^\'"]+)[\'"]/', $content, $matches)) {
                 $navigation[] = [
                     'method' => $method,
                     'type' => $type,
@@ -426,7 +426,7 @@ class RelationManagerAnalyzer
         ];
 
         foreach ($titleProperties as $property => $type) {
-            if (preg_match('/protected\s+static\s+\?string\s+\$' . $property . '\s*=\s*[\'"]([^\'"]+)[\'"]/', $content, $matches)) {
+            if (preg_match('/protected\s+static\s+\?string\s+\$'.$property.'\s*=\s*[\'"]([^\'"]+)[\'"]/', $content, $matches)) {
                 $titles[] = [
                     'property' => $property,
                     'type' => $type,

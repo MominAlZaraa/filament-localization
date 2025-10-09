@@ -3,12 +3,12 @@
 namespace MominAlZaraa\FilamentLocalization\Services;
 
 use Illuminate\Support\Facades\File;
-use MominAlZaraa\FilamentLocalization\Analyzers\ResourceAnalyzer;
 use MominAlZaraa\FilamentLocalization\Analyzers\PageAnalyzer;
 use MominAlZaraa\FilamentLocalization\Analyzers\RelationManagerAnalyzer;
-use MominAlZaraa\FilamentLocalization\Generators\ResourceModifier;
+use MominAlZaraa\FilamentLocalization\Analyzers\ResourceAnalyzer;
 use MominAlZaraa\FilamentLocalization\Generators\PageModifier;
 use MominAlZaraa\FilamentLocalization\Generators\RelationManagerModifier;
+use MominAlZaraa\FilamentLocalization\Generators\ResourceModifier;
 use MominAlZaraa\FilamentLocalization\Generators\TranslationFileGenerator;
 
 class LocalizationService
@@ -82,7 +82,7 @@ class LocalizationService
             // Analyze the page to find all localizable content
             $analysis = $this->pageAnalyzer->analyze($pageClass, $panel);
 
-            if (!$analysis['has_custom_content']) {
+            if (! $analysis['has_custom_content']) {
                 return; // No custom content to localize
             }
 
@@ -120,7 +120,7 @@ class LocalizationService
             // Analyze the relation manager to find all localizable content
             $analysis = $this->relationManagerAnalyzer->analyze($relationManagerClass, $panel);
 
-            if (!$analysis['has_custom_content']) {
+            if (! $analysis['has_custom_content']) {
                 return; // No custom content to localize
             }
 

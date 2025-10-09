@@ -299,21 +299,21 @@ class TranslationFileGenerator
 
         // Add label translations
         foreach ($analysis['labels'] as $label) {
-            if (!$label['has_translation']) {
+            if (! $label['has_translation']) {
                 $translations[$label['translation_key']] = $label['value'];
             }
         }
 
         // Add navigation translations
         foreach ($analysis['navigation'] as $nav) {
-            if (!$nav['has_translation']) {
+            if (! $nav['has_translation']) {
                 $translations[$nav['translation_key']] = $nav['value'];
             }
         }
 
         // Add title translations
         foreach ($analysis['titles'] as $title) {
-            if (!$title['has_translation']) {
+            if (! $title['has_translation']) {
                 $translations[$title['translation_key']] = $title['value'];
             }
         }
@@ -367,21 +367,21 @@ class TranslationFileGenerator
 
         // Add label translations
         foreach ($analysis['labels'] as $label) {
-            if (!$label['has_translation']) {
+            if (! $label['has_translation']) {
                 $translations[$label['translation_key']] = $label['value'];
             }
         }
 
         // Add navigation translations
         foreach ($analysis['navigation'] as $nav) {
-            if (!$nav['has_translation']) {
+            if (! $nav['has_translation']) {
                 $translations[$nav['translation_key']] = $nav['value'];
             }
         }
 
         // Add title translations
         foreach ($analysis['titles'] as $title) {
-            if (!$title['has_translation']) {
+            if (! $title['has_translation']) {
                 $translations[$title['translation_key']] = $title['value'];
             }
         }

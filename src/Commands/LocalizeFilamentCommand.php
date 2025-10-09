@@ -136,10 +136,10 @@ class LocalizeFilamentCommand extends Command
         // If specific panels are requested
         if ($this->option('panel')) {
             $requestedPanels = $this->option('panel');
-            $panels = $allPanels->filter(fn($panel) => in_array($panel->getId(), $requestedPanels));
+            $panels = $allPanels->filter(fn ($panel) => in_array($panel->getId(), $requestedPanels));
 
             if ($panels->isEmpty()) {
-                $this->error('❌ No matching panels found for: ' . implode(', ', $requestedPanels));
+                $this->error('❌ No matching panels found for: '.implode(', ', $requestedPanels));
 
                 return [];
             }
@@ -149,7 +149,7 @@ class LocalizeFilamentCommand extends Command
 
         // Filter out excluded panels
         $excludedPanels = config('filament-localization.excluded_panels', []);
-        $panels = $allPanels->filter(fn($panel) => ! in_array($panel->getId(), $excludedPanels));
+        $panels = $allPanels->filter(fn ($panel) => ! in_array($panel->getId(), $excludedPanels));
 
         return $panels->all();
     }
@@ -165,7 +165,7 @@ class LocalizeFilamentCommand extends Command
 
     protected function confirmProcessing(array $panels, array $locales): bool
     {
-        $panelNames = collect($panels)->map(fn($panel) => $panel->getId())->implode(', ');
+        $panelNames = collect($panels)->map(fn ($panel) => $panel->getId())->implode(', ');
 
         $this->table(
             ['Setting', 'Value'],
@@ -384,7 +384,7 @@ class LocalizeFilamentCommand extends Command
             preg_match_all('/use\s+([^;]+);/', $content, $useMatches);
 
             foreach ($useMatches[1] as $useStatement) {
-                if (str_ends_with($useStatement, '\\' . $pageClass) || $useStatement === $pageClass) {
+                if (str_ends_with($useStatement, '\\'.$pageClass) || $useStatement === $pageClass) {
                     return $useStatement;
                 }
 
@@ -399,7 +399,8 @@ class LocalizeFilamentCommand extends Command
             // If still not resolved, assume it's in the same namespace as the resource
             if (! str_contains($pageClass, '\\')) {
                 $resourceNamespace = (new \ReflectionClass($resourceClass))->getNamespaceName();
-                return $resourceNamespace . '\\Pages\\' . $pageClass;
+
+                return $resourceNamespace.'\\Pages\\'.$pageClass;
             }
         }
 
@@ -465,7 +466,7 @@ class LocalizeFilamentCommand extends Command
             preg_match_all('/use\s+([^;]+);/', $content, $useMatches);
 
             foreach ($useMatches[1] as $useStatement) {
-                if (str_ends_with($useStatement, '\\' . $relationManagerClass) || $useStatement === $relationManagerClass) {
+                if (str_ends_with($useStatement, '\\'.$relationManagerClass) || $useStatement === $relationManagerClass) {
                     return $useStatement;
                 }
 
@@ -480,7 +481,8 @@ class LocalizeFilamentCommand extends Command
             // If still not resolved, assume it's in the same namespace as the resource
             if (! str_contains($relationManagerClass, '\\')) {
                 $resourceNamespace = (new \ReflectionClass($resourceClass))->getNamespaceName();
-                return $resourceNamespace . '\\' . $relationManagerClass;
+
+                return $resourceNamespace.'\\'.$relationManagerClass;
             }
         }
 
@@ -556,14 +558,14 @@ class LocalizeFilamentCommand extends Command
             if (config('filament-localization.pint.enabled', true)) {
                 $this->info('🎨 Running Laravel Pint for code formatting...');
                 $pintResult = $this->pintService->formatCodeWithOutput();
-                
+
                 if ($pintResult['success']) {
                     $this->info('✅ Code formatted successfully!');
-                    if (!empty($pintResult['output'])) {
+                    if (! empty($pintResult['output'])) {
                         $this->line($pintResult['output']);
                     }
                 } else {
-                    $this->warn('⚠️  Pint formatting failed: ' . $pintResult['error']);
+                    $this->warn('⚠️  Pint formatting failed: '.$pintResult['error']);
                 }
             }
 
@@ -573,7 +575,7 @@ class LocalizeFilamentCommand extends Command
             $this->info('✅ Git commit created successfully!');
             $this->info('💡 You can revert this commit using: git reset --soft HEAD~1');
         } catch (\Exception $e) {
-            $this->error('❌ Failed to create git commit: ' . $e->getMessage());
+            $this->error('❌ Failed to create git commit: '.$e->getMessage());
         }
     }
 }

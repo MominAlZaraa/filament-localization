@@ -205,7 +205,7 @@ class PageModifier
             $escapedValue = preg_quote($label['value'], '/');
 
             // Replace hardcoded values with translation keys
-            $pattern = '/return\s+[\'"]' . $escapedValue . '[\'"]/';
+            $pattern = '/return\s+[\'"]'.$escapedValue.'[\'"]/';
             $replacement = "return __('$translationKey')";
 
             $content = preg_replace($pattern, $replacement, $content, 1);
@@ -225,7 +225,7 @@ class PageModifier
             $escapedValue = preg_quote($nav['value'], '/');
 
             // Replace hardcoded values with translation keys
-            $pattern = '/return\s+[\'"]' . $escapedValue . '[\'"]/';
+            $pattern = '/return\s+[\'"]'.$escapedValue.'[\'"]/';
             $replacement = "return __('$translationKey')";
 
             $content = preg_replace($pattern, $replacement, $content, 1);
@@ -245,8 +245,8 @@ class PageModifier
             $escapedValue = preg_quote($title['value'], '/');
 
             // Replace hardcoded values with null (we'll use getTitle() method instead)
-            $pattern = '/protected\s+static\s+\?string\s+\$' . $title['property'] . '\s*=\s*[\'"]' . $escapedValue . '[\'"]/';
-            $replacement = "protected static ?string \$" . $title['property'] . " = null";
+            $pattern = '/protected\s+static\s+\?string\s+\$'.$title['property'].'\s*=\s*[\'"]'.$escapedValue.'[\'"]/';
+            $replacement = 'protected static ?string $'.$title['property'].' = null';
 
             $content = preg_replace($pattern, $replacement, $content, 1);
         }
@@ -260,7 +260,7 @@ class PageModifier
         $translationKey = $this->buildTranslationKey($analysis, $panel, 'title');
 
         // Check if getTitle method exists (non-static for pages)
-        if (!preg_match('/public\s+function\s+getTitle\s*\(/', $content)) {
+        if (! preg_match('/public\s+function\s+getTitle\s*\(/', $content)) {
             // Add getTitle method before the closing brace
             $pattern = '/(\n\s*}\s*)$/';
             if (preg_match($pattern, $content, $matches, PREG_OFFSET_CAPTURE)) {

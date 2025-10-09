@@ -65,7 +65,7 @@ class PageAnalyzer
         // Check if this page has custom content that needs localization
         $analysis['has_custom_content'] = $this->hasCustomContent($content);
 
-        if (!$analysis['has_custom_content']) {
+        if (! $analysis['has_custom_content']) {
             return $analysis;
         }
 
@@ -100,7 +100,7 @@ class PageAnalyzer
             '/ColorEntry::make\(/',
             '/KeyValueEntry::make\(/',
             '/RepeatableEntry::make\(/',
-            
+
             // Custom actions
             '/Action::make\(/',
             '/CreateAction::make\(/',
@@ -108,19 +108,19 @@ class PageAnalyzer
             '/DeleteAction::make\(/',
             '/ViewAction::make\(/',
             '/BulkAction::make\(/',
-            
+
             // Custom sections
             '/Section::make\(/',
             '/Fieldset::make\(/',
             '/Grid::make\(/',
             '/Tabs::make\(/',
             '/Wizard::make\(/',
-            
+
             // Custom labels and titles
             '/->label\([\'"][^\'"]+[\'"]\)/',
             '/->title\([\'"][^\'"]+[\'"]\)/',
             '/->heading\([\'"][^\'"]+[\'"]\)/',
-            
+
             // Custom HTML content
             '/->html\(/',
             '/->state\(/',
@@ -233,7 +233,7 @@ class PageAnalyzer
             '/->title\([\'"]([^\'"]+)[\'"]\)/',
             '/->heading\([\'"]([^\'"]+)[\'"]\)/',
             '/->description\([\'"]([^\'"]+)[\'"]\)/',
-            
+
             // HTML content with hardcoded strings
             '/->html\([\'"]([^\'"]+)[\'"]\)/',
             '/->state\([\'"]([^\'"]+)[\'"]\)/',
@@ -241,7 +241,7 @@ class PageAnalyzer
 
         foreach ($patterns as $pattern) {
             preg_match_all($pattern, $content, $matches);
-            
+
             if (! empty($matches[1])) {
                 foreach ($matches[1] as $match) {
                     // Skip very short strings or obvious field names
@@ -325,12 +325,12 @@ class PageAnalyzer
         // Check for existing non-static label methods (getTitle, getHeading, getSubheading)
         $labelMethods = [
             'getTitle' => 'title',
-            'getHeading' => 'heading', 
+            'getHeading' => 'heading',
             'getSubheading' => 'subheading',
         ];
 
         foreach ($labelMethods as $method => $type) {
-            if (preg_match('/public\s+function\s+' . $method . '\s*\([^)]*\)\s*:\s*[^{]*{[^}]*return\s+[\'"]([^\'"]+)[\'"]/', $content, $matches)) {
+            if (preg_match('/public\s+function\s+'.$method.'\s*\([^)]*\)\s*:\s*[^{]*{[^}]*return\s+[\'"]([^\'"]+)[\'"]/', $content, $matches)) {
                 $labels[] = [
                     'method' => $method,
                     'type' => $type,
@@ -359,7 +359,7 @@ class PageAnalyzer
         ];
 
         foreach ($navigationMethods as $method => $type) {
-            if (preg_match('/public\s+(?:static\s+)?function\s+' . $method . '\s*\([^)]*\)\s*:\s*[^{]*{[^}]*return\s+[\'"]([^\'"]+)[\'"]/', $content, $matches)) {
+            if (preg_match('/public\s+(?:static\s+)?function\s+'.$method.'\s*\([^)]*\)\s*:\s*[^{]*{[^}]*return\s+[\'"]([^\'"]+)[\'"]/', $content, $matches)) {
                 $navigation[] = [
                     'method' => $method,
                     'type' => $type,
@@ -383,7 +383,7 @@ class PageAnalyzer
         ];
 
         foreach ($titleProperties as $property => $type) {
-            if (preg_match('/protected\s+static\s+\?string\s+\$' . $property . '\s*=\s*[\'"]([^\'"]+)[\'"]/', $content, $matches)) {
+            if (preg_match('/protected\s+static\s+\?string\s+\$'.$property.'\s*=\s*[\'"]([^\'"]+)[\'"]/', $content, $matches)) {
                 $titles[] = [
                     'property' => $property,
                     'type' => $type,
