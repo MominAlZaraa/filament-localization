@@ -1,0 +1,67 @@
+{
+  "name": "Filament Localization",
+  "slug": "filament-localization",
+  "package": "mominalzaraa/filament-localization",
+  "description": "Automatically scan and localize Filament resources with structured translation files. Supports 40+ component types, multi-locale generation, and comprehensive statistics tracking.",
+  "repository": "https://github.com/MominAlZaraa/filament-localization",
+  "author": {
+    "name": "Momin Al Zaraa",
+    "email": "support@mominpert.com",
+    "website": "https://mominpert.com",
+    "github": "MominAlZaraa",
+    "avatar": "https://raw.githubusercontent.com/MominAlZaraa/filament-localization/main/founder/Momin%20Al%20Zaraa.jpg",
+    "bio": "Full-stack developer and Laravel enthusiast specializing in building scalable web applications and developer tools.",
+    "social": {
+      "linkedin": "https://www.linkedin.com/in/momin-al-zaraa-255693168/",
+      "instagram": "https://www.instagram.com/momin_alzaraa",
+      "website": "https://mominpert.com"
+    }
+  },
+  "image": "https://raw.githubusercontent.com/MominAlZaraa/filament-localization/main/.github/plugin-banner.jpg",
+  "tags": [
+    "localization",
+    "translation",
+    "i18n",
+    "multilingual",
+    "automation",
+    "developer-tools"
+  ],
+  "version": "1.0.0",
+  "license": "MIT",
+  "requirements": {
+    "php": "^8.2|^8.3|^8.4",
+    "laravel": "^12.0",
+    "filament": "^4.0"
+  },
+  "features": [
+    "Automatic scanning of all Filament resources",
+    "Support for 40+ Filament component types",
+    "Multi-locale translation generation",
+    "Panel-based, nested, and flat translation structures",
+    "Comprehensive statistics tracking",
+    "Git integration for easy reverting",
+    "Dry-run mode for previewing changes",
+    "Configurable label generation strategies",
+    "Backup creation before modifications"
+  ],
+  "screenshots": [
+    {
+      "url": "https://raw.githubusercontent.com/MominAlZaraa/filament-localization/main/.github/screenshot-command.jpg",
+      "caption": "Running the localization command"
+    },
+    {
+      "url": "https://raw.githubusercontent.com/MominAlZaraa/filament-localization/main/.github/screenshot-output.jpg",
+      "caption": "Command output with statistics"
+    },
+    {
+      "url": "https://raw.githubusercontent.com/MominAlZaraa/filament-localization/main/.github/screenshot-files.jpg",
+      "caption": "Generated translation files structure"
+    }
+  ],
+  "documentation": "https://github.com/MominAlZaraa/filament-localization#readme",
+  "support": {
+    "email": "support@mominpert.com",
+    "issues": "https://github.com/MominAlZaraa/filament-localization/issues",
+    "discussions": "https://github.com/MominAlZaraa/filament-localization/discussions"
+  }
+}
