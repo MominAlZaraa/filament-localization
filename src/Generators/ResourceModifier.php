@@ -101,7 +101,7 @@ class ResourceModifier
 
                 // Pattern: Find make('field') followed by ->label() anywhere after it
                 // Use a more robust pattern that handles nested parentheses in label
-                $pattern = "/({$component}::make\(['\"]" . $escapedFieldName . "['\"]\)(?:.*?))->label\((?:[^()]*|\([^()]*\))*\)/s";
+                $pattern = "/({$component}::make\(['\"]".$escapedFieldName."['\"]\)(?:.*?))->label\((?:[^()]*|\([^()]*\))*\)/s";
                 $replacement = "$1->label(__('$translationKey'))";
 
                 $newContent = preg_replace($pattern, $replacement, $content, 1);
@@ -115,7 +115,7 @@ class ResourceModifier
                 // Add label after make()
                 // Pattern to match just the make() call
                 $escapedFieldName = preg_quote($fieldName, '/');
-                $pattern = "/({$component}::make\(['\"]" . $escapedFieldName . "['\"]\))/";
+                $pattern = "/({$component}::make\(['\"]".$escapedFieldName."['\"]\))/";
                 $replacement = "$1\n                    ->label(__('$translationKey'))";
 
                 $newContent = preg_replace($pattern, $replacement, $content, 1);
@@ -148,7 +148,7 @@ class ResourceModifier
                 $escapedColumnName = preg_quote($columnName, '/');
 
                 // Pattern: Find make('column') followed by ->label() anywhere after it
-                $pattern = "/({$component}::make\(['\"]" . $escapedColumnName . "['\"]\)(?:.*?))->label\((?:[^()]*|\([^()]*\))*\)/s";
+                $pattern = "/({$component}::make\(['\"]".$escapedColumnName."['\"]\)(?:.*?))->label\((?:[^()]*|\([^()]*\))*\)/s";
                 $replacement = "$1->label(__('$translationKey'))";
 
                 $newContent = preg_replace($pattern, $replacement, $content, 1);
@@ -160,7 +160,7 @@ class ResourceModifier
             } else {
                 // Add label after make()
                 $escapedColumnName = preg_quote($columnName, '/');
-                $pattern = "/({$component}::make\(['\"]" . $escapedColumnName . "['\"]\))/";
+                $pattern = "/({$component}::make\(['\"]".$escapedColumnName."['\"]\))/";
                 $replacement = "$1\n                    ->label(__('$translationKey'))";
 
                 $newContent = preg_replace($pattern, $replacement, $content, 1);
@@ -191,7 +191,7 @@ class ResourceModifier
                 $escapedActionName = preg_quote($actionName, '/');
 
                 // Pattern: Find make('action') followed by ->label() anywhere after it
-                $pattern = "/(Action::make\(['\"]" . $escapedActionName . "['\"]\)(?:.*?))->label\((?:[^()]*|\([^()]*\))*\)/s";
+                $pattern = "/(Action::make\(['\"]".$escapedActionName."['\"]\)(?:.*?))->label\((?:[^()]*|\([^()]*\))*\)/s";
                 $replacement = "$1->label(__('$translationKey'))";
 
                 $newContent = preg_replace($pattern, $replacement, $content, 1);
@@ -203,7 +203,7 @@ class ResourceModifier
             } else {
                 // Add label after make()
                 $escapedActionName = preg_quote($actionName, '/');
-                $pattern = "/(Action::make\(['\"]" . $escapedActionName . "['\"]\))/";
+                $pattern = "/(Action::make\(['\"]".$escapedActionName."['\"]\))/";
                 $replacement = "$1\n                    ->label(__('$translationKey'))";
 
                 $newContent = preg_replace($pattern, $replacement, $content, 1);
@@ -226,11 +226,11 @@ class ResourceModifier
             $translationKey = $this->buildTranslationKey($analysis, $panel, $section['translation_key']);
 
             // Replace hardcoded section titles with translation keys
-            $pattern = "/({$component}::make\(['\"])" . preg_quote($title, '/') . ("['\"]\))/");
+            $pattern = "/({$component}::make\(['\"])".preg_quote($title, '/').("['\"]\))/");
             $replacement = "$1' . __('$translationKey') . '$2";
 
             // Better approach: replace the entire make call
-            $pattern = "/{$component}::make\(['\"]" . preg_quote($title, '/') . "['\"]\)/";
+            $pattern = "/{$component}::make\(['\"]".preg_quote($title, '/')."['\"]\)/";
             $replacement = "{$component}::make(__('$translationKey'))";
 
             $content = preg_replace($pattern, $replacement, $content, 1);
@@ -255,7 +255,7 @@ class ResourceModifier
                 $escapedFilterName = preg_quote($filterName, '/');
 
                 // Pattern: Find make('filter') followed by ->label() anywhere after it
-                $pattern = "/((?:Select|Ternary|)Filter::make\(['\"]" . $escapedFilterName . "['\"]\)(?:.*?))->label\((?:[^()]*|\([^()]*\))*\)/s";
+                $pattern = "/((?:Select|Ternary|)Filter::make\(['\"]".$escapedFilterName."['\"]\)(?:.*?))->label\((?:[^()]*|\([^()]*\))*\)/s";
                 $replacement = "$1->label(__('$translationKey'))";
 
                 $newContent = preg_replace($pattern, $replacement, $content, 1);
@@ -266,7 +266,7 @@ class ResourceModifier
             } else {
                 // Add label after make()
                 $escapedFilterName = preg_quote($filterName, '/');
-                $pattern = "/((?:Select|Ternary|)Filter::make\(['\"]" . $escapedFilterName . "['\"]\))/";
+                $pattern = "/((?:Select|Ternary|)Filter::make\(['\"]".$escapedFilterName."['\"]\))/";
                 $replacement = "$1\n                    ->label(__('$translationKey'))";
 
                 $newContent = preg_replace($pattern, $replacement, $content, 1);
@@ -287,15 +287,15 @@ class ResourceModifier
 
         return match ($structure) {
             'flat' => "{$prefix}.{$key}",
-            'nested' => "{$prefix}/" . Str::snake($analysis['resource_name']) . ".{$key}",
-            'panel-based' => "{$prefix}/{$panel->getId()}/" . Str::snake($analysis['resource_name']) . ".{$key}",
-            default => "{$prefix}/{$panel->getId()}/" . Str::snake($analysis['resource_name']) . ".{$key}",
+            'nested' => "{$prefix}/".Str::snake($analysis['resource_name']).".{$key}",
+            'panel-based' => "{$prefix}/{$panel->getId()}/".Str::snake($analysis['resource_name']).".{$key}",
+            default => "{$prefix}/{$panel->getId()}/".Str::snake($analysis['resource_name']).".{$key}",
         };
     }
 
     protected function createBackup(string $filePath): void
     {
-        $backupPath = $filePath . '.backup.' . date('Y-m-d-H-i-s');
+        $backupPath = $filePath.'.backup.'.date('Y-m-d-H-i-s');
         File::copy($filePath, $backupPath);
     }
 
@@ -414,7 +414,7 @@ class ResourceModifier
 
     protected function updateOrAddMethod(string $content, string $methodName, string $translationKey, bool $force = false): string
     {
-        $methodPattern = '/public\s+static\s+function\s+' . $methodName . '\s*\([^)]*\)\s*:\s*string\s*\{[^}]*\}/s';
+        $methodPattern = '/public\s+static\s+function\s+'.$methodName.'\s*\([^)]*\)\s*:\s*string\s*\{[^}]*\}/s';
 
         $newMethod = "    public static function {$methodName}(): string\n    {\n        return __('{$translationKey}');\n    }";
 
@@ -429,7 +429,7 @@ class ResourceModifier
             $pattern = '/(\n\s*}\s*)$/';
             if (preg_match($pattern, $content, $matches, PREG_OFFSET_CAPTURE)) {
                 $insertPosition = $matches[0][1];
-                $content = substr_replace($content, "\n" . $newMethod . "\n", $insertPosition, 0);
+                $content = substr_replace($content, "\n".$newMethod."\n", $insertPosition, 0);
             }
         }
 
