@@ -78,7 +78,7 @@ class RelationManagerModifier
                 $escapedFieldName = preg_quote($fieldName, '/');
 
                 // Pattern: Find make('field') followed by ->label() anywhere after it
-                $pattern = "/({$component}::make\(['\"]" . $escapedFieldName . "['\"]\)(?:.*?))->label\((?:[^()]*|\([^()]*\))*\)/s";
+                $pattern = "/({$component}::make\(['\"]".$escapedFieldName."['\"]\)(?:.*?))->label\((?:[^()]*|\([^()]*\))*\)/s";
                 $replacement = "$1->label(__('$translationKey'))";
 
                 $newContent = preg_replace($pattern, $replacement, $content, 1);
@@ -91,7 +91,7 @@ class RelationManagerModifier
             } else {
                 // Add label after make()
                 $escapedFieldName = preg_quote($fieldName, '/');
-                $pattern = "/({$component}::make\(['\"]" . $escapedFieldName . "['\"]\))/";
+                $pattern = "/({$component}::make\(['\"]".$escapedFieldName."['\"]\))/";
                 $replacement = "$1\n                    ->label(__('$translationKey'))";
 
                 $newContent = preg_replace($pattern, $replacement, $content, 1);
@@ -124,7 +124,7 @@ class RelationManagerModifier
                 $escapedColumnName = preg_quote($columnName, '/');
 
                 // Pattern: Find make('column') followed by ->label() anywhere after it
-                $pattern = "/({$component}::make\(['\"]" . $escapedColumnName . "['\"]\)(?:.*?))->label\((?:[^()]*|\([^()]*\))*\)/s";
+                $pattern = "/({$component}::make\(['\"]".$escapedColumnName."['\"]\)(?:.*?))->label\((?:[^()]*|\([^()]*\))*\)/s";
                 $replacement = "$1->label(__('$translationKey'))";
 
                 $newContent = preg_replace($pattern, $replacement, $content, 1);
@@ -136,7 +136,7 @@ class RelationManagerModifier
             } else {
                 // Add label after make()
                 $escapedColumnName = preg_quote($columnName, '/');
-                $pattern = "/({$component}::make\(['\"]" . $escapedColumnName . "['\"]\))/";
+                $pattern = "/({$component}::make\(['\"]".$escapedColumnName."['\"]\))/";
                 $replacement = "$1\n                    ->label(__('$translationKey'))";
 
                 $newContent = preg_replace($pattern, $replacement, $content, 1);
@@ -168,7 +168,7 @@ class RelationManagerModifier
                 $escapedActionName = preg_quote($actionName, '/');
 
                 // Pattern: Find make('action') followed by ->label() anywhere after it
-                $pattern = "/({$component}::make\(['\"]" . $escapedActionName . "['\"]\)(?:.*?))->label\((?:[^()]*|\([^()]*\))*\)/s";
+                $pattern = "/({$component}::make\(['\"]".$escapedActionName."['\"]\)(?:.*?))->label\((?:[^()]*|\([^()]*\))*\)/s";
                 $replacement = "$1->label(__('$translationKey'))";
 
                 $newContent = preg_replace($pattern, $replacement, $content, 1);
@@ -180,7 +180,7 @@ class RelationManagerModifier
             } else {
                 // Add label after make()
                 $escapedActionName = preg_quote($actionName, '/');
-                $pattern = "/({$component}::make\(['\"]" . $escapedActionName . "['\"]\))/";
+                $pattern = "/({$component}::make\(['\"]".$escapedActionName."['\"]\))/";
                 $replacement = "$1\n                    ->label(__('$translationKey'))";
 
                 $newContent = preg_replace($pattern, $replacement, $content, 1);
@@ -203,7 +203,7 @@ class RelationManagerModifier
             $translationKey = $this->buildTranslationKey($analysis, $panel, $section['translation_key']);
 
             // Replace hardcoded section titles with translation keys
-            $pattern = "/{$component}::make\(['\"]" . preg_quote($title, '/') . "['\"]\)/";
+            $pattern = "/{$component}::make\(['\"]".preg_quote($title, '/')."['\"]\)/";
             $replacement = "{$component}::make(__('$translationKey'))";
 
             $content = preg_replace($pattern, $replacement, $content, 1);
@@ -228,7 +228,7 @@ class RelationManagerModifier
                 $escapedFilterName = preg_quote($filterName, '/');
 
                 // Pattern: Find make('filter') followed by ->label() anywhere after it
-                $pattern = "/((?:Select|Ternary|)Filter::make\(['\"]" . $escapedFilterName . "['\"]\)(?:.*?))->label\((?:[^()]*|\([^()]*\))*\)/s";
+                $pattern = "/((?:Select|Ternary|)Filter::make\(['\"]".$escapedFilterName."['\"]\)(?:.*?))->label\((?:[^()]*|\([^()]*\))*\)/s";
                 $replacement = "$1->label(__('$translationKey'))";
 
                 $newContent = preg_replace($pattern, $replacement, $content, 1);
@@ -239,7 +239,7 @@ class RelationManagerModifier
             } else {
                 // Add label after make()
                 $escapedFilterName = preg_quote($filterName, '/');
-                $pattern = "/((?:Select|Ternary|)Filter::make\(['\"]" . $escapedFilterName . "['\"]\))/";
+                $pattern = "/((?:Select|Ternary|)Filter::make\(['\"]".$escapedFilterName."['\"]\))/";
                 $replacement = "$1\n                    ->label(__('$translationKey'))";
 
                 $newContent = preg_replace($pattern, $replacement, $content, 1);
@@ -260,9 +260,9 @@ class RelationManagerModifier
 
         return match ($structure) {
             'flat' => "{$prefix}.{$key}",
-            'nested' => "{$prefix}/" . Str::snake($analysis['relation_manager_name']) . ".{$key}",
-            'panel-based' => "{$prefix}/{$panel->getId()}/" . Str::snake($analysis['relation_manager_name']) . ".{$key}",
-            default => "{$prefix}/{$panel->getId()}/" . Str::snake($analysis['relation_manager_name']) . ".{$key}",
+            'nested' => "{$prefix}/".Str::snake($analysis['relation_manager_name']).".{$key}",
+            'panel-based' => "{$prefix}/{$panel->getId()}/".Str::snake($analysis['relation_manager_name']).".{$key}",
+            default => "{$prefix}/{$panel->getId()}/".Str::snake($analysis['relation_manager_name']).".{$key}",
         };
     }
 
@@ -277,7 +277,7 @@ class RelationManagerModifier
             $escapedValue = preg_quote($label['value'], '/');
 
             // Replace hardcoded values with translation keys
-            $pattern = '/return\s+[\'"]' . $escapedValue . '[\'"]/';
+            $pattern = '/return\s+[\'"]'.$escapedValue.'[\'"]/';
             $replacement = "return __('$translationKey')";
 
             $content = preg_replace($pattern, $replacement, $content, 1);
@@ -297,7 +297,7 @@ class RelationManagerModifier
             $escapedValue = preg_quote($nav['value'], '/');
 
             // Replace hardcoded values with translation keys
-            $pattern = '/return\s+[\'"]' . $escapedValue . '[\'"]/';
+            $pattern = '/return\s+[\'"]'.$escapedValue.'[\'"]/';
             $replacement = "return __('$translationKey')";
 
             $content = preg_replace($pattern, $replacement, $content, 1);
@@ -317,8 +317,8 @@ class RelationManagerModifier
             $escapedValue = preg_quote($title['value'], '/');
 
             // Replace hardcoded values with null (we'll use getTitle() method instead)
-            $pattern = '/protected\s+static\s+\?string\s+\$' . $title['property'] . '\s*=\s*[\'"]' . $escapedValue . '[\'"]/';
-            $replacement = 'protected static ?string $' . $title['property'] . ' = null';
+            $pattern = '/protected\s+static\s+\?string\s+\$'.$title['property'].'\s*=\s*[\'"]'.$escapedValue.'[\'"]/';
+            $replacement = 'protected static ?string $'.$title['property'].' = null';
 
             $content = preg_replace($pattern, $replacement, $content, 1);
         }
@@ -361,7 +361,7 @@ class RelationManagerModifier
 
     protected function createBackup(string $filePath): void
     {
-        $backupPath = $filePath . '.backup.' . date('Y-m-d-H-i-s');
+        $backupPath = $filePath.'.backup.'.date('Y-m-d-H-i-s');
         File::copy($filePath, $backupPath);
     }
 }
