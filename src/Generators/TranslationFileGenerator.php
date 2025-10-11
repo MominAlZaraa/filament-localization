@@ -45,8 +45,8 @@ class TranslationFileGenerator
             $existingTranslations = include $translationPath;
         }
 
-        // Merge translations (preserve existing ones)
-        $mergedTranslations = array_merge($translations, $existingTranslations);
+        // Merge translations intelligently - preserve existing translations and only add missing keys
+        $mergedTranslations = $this->mergeTranslationsIntelligently($existingTranslations, $translations);
 
         // Sort translations alphabetically
         ksort($mergedTranslations);
@@ -84,18 +84,57 @@ class TranslationFileGenerator
     {
         $translations = [];
 
-        // Add resource label translations
+        // Add resource label translations - use existing static properties if available
+        $staticProperties = $analysis['static_properties'] ?? [];
         $resourceName = $analysis['resource_name'];
-        $resourceLabel = $this->generateLabelFromResourceName($resourceName);
 
-        $translations['navigation_label'] = Str::plural($resourceLabel);
-        $translations['model_label'] = $resourceLabel;
-        $translations['plural_model_label'] = Str::plural($resourceLabel);
+        // Use existing static properties or generate from resource name
+        $modelLabel = $staticProperties['model_label'] ?? $this->generateLabelFromResourceName($resourceName);
+        $navigationLabel = $staticProperties['navigation_label'] ?? Str::plural($modelLabel);
+        $pluralModelLabel = $staticProperties['plural_model_label'] ?? Str::plural($modelLabel);
+
+        // Handle getModelLabel method - if it exists, we should remove or nullify static properties
+        if ($staticProperties['has_get_model_label'] ?? false) {
+            // If getModelLabel exists, we don't need static property translations
+            // The getModelLabel method will handle the labels dynamically
+            // We can optionally add a comment or skip these translations
+        } else {
+            // Only add translations if they don't already exist in the target file
+            // or if we're not preserving existing labels
+            if (! config('filament-localization.preserve_existing_labels', false)) {
+                $translations['navigation_label'] = $navigationLabel;
+                $translations['model_label'] = $modelLabel;
+                $translations['plural_model_label'] = $pluralModelLabel;
+            }
+        }
 
         // Add field translations
         foreach ($analysis['fields'] as $field) {
+            // Only add if field doesn't have a label OR if we're not preserving existing labels
             if (! $field['has_label'] || ! config('filament-localization.preserve_existing_labels', false)) {
                 $translations[$field['translation_key']] = $field['default_label'];
+            }
+
+            // Add description translations if field has description
+            if ($field['has_description']) {
+                $descriptionKey = $field['translation_key'].'_description';
+                $translations[$descriptionKey] = $field['default_label'].' Description';
+            }
+
+            // Add Select options translations
+            if (isset($field['select_options']) && ! empty($field['select_options'])) {
+                foreach ($field['select_options'] as $option) {
+                    // Use the translation_key from the option (which now handles boolean fields correctly)
+                    $optionKey = $field['translation_key'].'.'.$option['translation_key'];
+                    // Use the option value for the translation text
+                    $translations[$optionKey] = $option['value'];
+                }
+            }
+
+            // Add default value translations
+            if (isset($field['has_default']) && $field['has_default']) {
+                $defaultKey = $field['translation_key'].'_default';
+                $translations[$defaultKey] = $field['default_label'].' Default';
             }
         }
 
@@ -115,7 +154,18 @@ class TranslationFileGenerator
 
         // Add section translations
         foreach ($analysis['sections'] as $section) {
-            $translations[$section['translation_key']] = $section['title'];
+            $hasTranslation = $section['has_translation'] ?? false;
+
+            // Only add section translations if they don't already have translations
+            if (! $hasTranslation) {
+                $translations[$section['translation_key']] = $section['title'];
+            }
+
+            // Add description translations if section has description
+            if (isset($section['has_description']) && $section['has_description']) {
+                $descriptionKey = $section['translation_key'].'_description';
+                $translations[$descriptionKey] = $section['title'].' Description';
+            }
         }
 
         // Add filter translations
@@ -126,6 +176,43 @@ class TranslationFileGenerator
         }
 
         return $translations;
+    }
+
+    public function handleStaticPropertiesForGetModelLabel(array $analysis, bool $dryRun = false): void
+    {
+        $staticProperties = $analysis['static_properties'] ?? [];
+
+        // Only proceed if getModelLabel method exists
+        if (! ($staticProperties['has_get_model_label'] ?? false)) {
+            return;
+        }
+
+        $filePath = $analysis['file_path'];
+        if (! File::exists($filePath)) {
+            return;
+        }
+
+        $content = File::get($filePath);
+        $originalContent = $content;
+
+        // Remove or nullify static properties that are handled by getModelLabel
+        $propertiesToHandle = ['modelLabel', 'navigationLabel', 'pluralModelLabel'];
+
+        foreach ($propertiesToHandle as $property) {
+            // Pattern to match static property declarations
+            $pattern = '/protected static \?\w+ \$'.$property.'\s*=\s*[\'"][^\'"]*[\'"];?\s*\n?/';
+
+            if (preg_match($pattern, $content)) {
+                // Replace with null assignment
+                $replacement = "protected static ?string \${$property} = null;\n";
+                $content = preg_replace($pattern, $replacement, $content);
+            }
+        }
+
+        // Only write if content changed and not in dry run mode
+        if ($content !== $originalContent && ! $dryRun) {
+            File::put($filePath, $content);
+        }
     }
 
     protected function generateLabelFromResourceName(string $resourceName): string
@@ -169,8 +256,8 @@ class TranslationFileGenerator
             $existingTranslations = include $translationPath;
         }
 
-        // Merge translations (preserve existing ones)
-        $mergedTranslations = array_merge($translations, $existingTranslations);
+        // Merge translations intelligently - preserve existing translations and only add missing keys
+        $mergedTranslations = $this->mergeTranslationsIntelligently($existingTranslations, $translations);
 
         // Sort translations alphabetically
         ksort($mergedTranslations);
@@ -221,8 +308,8 @@ class TranslationFileGenerator
             $existingTranslations = include $translationPath;
         }
 
-        // Merge translations (preserve existing ones)
-        $mergedTranslations = array_merge($translations, $existingTranslations);
+        // Merge translations intelligently - preserve existing translations and only add missing keys
+        $mergedTranslations = $this->mergeTranslationsIntelligently($existingTranslations, $translations);
 
         // Sort translations alphabetically
         ksort($mergedTranslations);
@@ -289,7 +376,18 @@ class TranslationFileGenerator
 
         // Add section translations
         foreach ($analysis['sections'] as $section) {
-            $translations[$section['translation_key']] = $section['title'];
+            $hasTranslation = $section['has_translation'] ?? false;
+
+            // Only add section translations if they don't already have translations
+            if (! $hasTranslation) {
+                $translations[$section['translation_key']] = $section['title'];
+            }
+
+            // Add description translations if section has description
+            if (isset($section['has_description']) && $section['has_description']) {
+                $descriptionKey = $section['translation_key'].'_description';
+                $translations[$descriptionKey] = $section['title'].' Description';
+            }
         }
 
         // Add custom content translations
@@ -355,7 +453,18 @@ class TranslationFileGenerator
 
         // Add section translations
         foreach ($analysis['sections'] as $section) {
-            $translations[$section['translation_key']] = $section['title'];
+            $hasTranslation = $section['has_translation'] ?? false;
+
+            // Only add section translations if they don't already have translations
+            if (! $hasTranslation) {
+                $translations[$section['translation_key']] = $section['title'];
+            }
+
+            // Add description translations if section has description
+            if (isset($section['has_description']) && $section['has_description']) {
+                $descriptionKey = $section['translation_key'].'_description';
+                $translations[$descriptionKey] = $section['title'].' Description';
+            }
         }
 
         // Add filter translations
@@ -422,5 +531,45 @@ class TranslationFileGenerator
         $content .= "\n];\n";
 
         return $content;
+    }
+
+    protected function generateLabel(string $fieldName): string
+    {
+        $strategy = config('filament-localization.label_generation', 'title_case');
+
+        // Handle dot notation (e.g., 'patient_details.phone_number')
+        // Take only the last part after the dot
+        if (Str::contains($fieldName, '.')) {
+            $parts = explode('.', $fieldName);
+            $fieldName = end($parts);
+        }
+
+        // Remove common suffixes only if they're at the end with underscore
+        $label = preg_replace('/_id$/', '', $fieldName);
+        $label = preg_replace('/_at$/', '', $label);
+
+        // Convert snake_case to words
+        $label = str_replace('_', ' ', $label);
+
+        return match ($strategy) {
+            'title_case' => Str::title($label),
+            'sentence_case' => Str::ucfirst($label),
+            'keep_original' => $label,
+            default => Str::title($label),
+        };
+    }
+
+    protected function mergeTranslationsIntelligently(array $existingTranslations, array $newTranslations): array
+    {
+        $merged = $existingTranslations;
+
+        foreach ($newTranslations as $key => $value) {
+            // Only add the key if it doesn't exist in existing translations
+            if (! array_key_exists($key, $existingTranslations)) {
+                $merged[$key] = $value;
+            }
+        }
+
+        return $merged;
     }
 }

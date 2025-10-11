@@ -176,4 +176,22 @@ return [
 
     'verbose' => true,
 
+    /*
+    |--------------------------------------------------------------------------
+    | DeepL Translation Integration
+    |--------------------------------------------------------------------------
+    |
+    | Configuration for DeepL API integration for automatic translation.
+    | Set your DeepL API key in the .env file as DEEPL_API_KEY.
+    |
+    */
+
+    'deepl' => [
+        'api_key' => env('DEEPL_API_KEY'),
+        'base_url' => env('DEEPL_BASE_URL', 'https://api-free.deepl.com/v2'),
+        'timeout' => 60,
+        'batch_size' => 50,
+        'preserve_formatting' => true,
+    ],
+
 ];
