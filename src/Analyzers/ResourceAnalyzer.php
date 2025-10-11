@@ -85,6 +85,7 @@ class ResourceAnalyzer
             'filters' => [],
             'relation_managers' => [],
             'schema_files' => [], // Track separate schema files
+            'static_properties' => $this->analyzeStaticProperties($content),
         ];
 
         // Detect and load separate schema files (like UserForm, UserTable, etc.)
@@ -144,6 +145,36 @@ class ResourceAnalyzer
         return $analysis;
     }
 
+    protected function analyzeStaticProperties(string $content): array
+    {
+        $properties = [
+            'model_label' => null,
+            'navigation_label' => null,
+            'plural_model_label' => null,
+            'has_get_model_label' => false,
+        ];
+
+        // Check for static properties
+        if (preg_match('/protected static \?\w+ \$modelLabel\s*=\s*[\'"]([^\'"]+)[\'"]/', $content, $matches)) {
+            $properties['model_label'] = $matches[1];
+        }
+
+        if (preg_match('/protected static \?\w+ \$navigationLabel\s*=\s*[\'"]([^\'"]+)[\'"]/', $content, $matches)) {
+            $properties['navigation_label'] = $matches[1];
+        }
+
+        if (preg_match('/protected static \?\w+ \$pluralModelLabel\s*=\s*[\'"]([^\'"]+)[\'"]/', $content, $matches)) {
+            $properties['plural_model_label'] = $matches[1];
+        }
+
+        // Check for getModelLabel method
+        if (preg_match('/public static function getModelLabel\(\)/', $content)) {
+            $properties['has_get_model_label'] = true;
+        }
+
+        return $properties;
+    }
+
     protected function analyzeFormFields(string $content): array
     {
         $fields = [];
@@ -169,10 +200,24 @@ class ResourceAnalyzer
                     // Check if this field already has a label
                     $hasLabel = $this->hasLabel($content, $fieldName, $component);
 
+                    // Check if this field has a description
+                    $hasDescription = $this->hasDescription($content, $fieldName, $component);
+
+                    // Check if this is a Select component with hardcoded options
+                    $selectOptions = [];
+                    $hasDefault = false;
+                    if ($component === 'Select') {
+                        $selectOptions = $this->analyzeSelectOptions($content, $fieldName, $component);
+                        $hasDefault = $this->hasDefault($content, $fieldName, $component);
+                    }
+
                     $fields[] = [
                         'name' => $fieldName,
                         'component' => $component,
                         'has_label' => $hasLabel,
+                        'has_description' => $hasDescription,
+                        'has_default' => $hasDefault,
+                        'select_options' => $selectOptions,
                         'default_label' => $this->generateLabel($fieldName),
                         'translation_key' => $this->generateTranslationKey($fieldName),
                     ];
@@ -241,24 +286,60 @@ class ResourceAnalyzer
     protected function analyzeSections(string $content): array
     {
         $sections = [];
+        $titleCounts = []; // Track how many times each title appears
 
         foreach ($this->layoutComponents as $component) {
-            // Match patterns like: Section::make('Section Title')
-            $pattern = "/{$component}::make\(['\"]([^'\"]+)['\"]\)/";
+            // Match patterns like: Section::make('Section Title') - hardcoded strings
+            $hardcodedPattern = "/{$component}::make\(['\"]([^'\"]+)['\"]\)/";
+            preg_match_all($hardcodedPattern, $content, $hardcodedMatches);
 
-            preg_match_all($pattern, $content, $matches);
-
-            if (! empty($matches[1])) {
-                foreach ($matches[1] as $sectionTitle) {
+            if (! empty($hardcodedMatches[1])) {
+                foreach ($hardcodedMatches[1] as $sectionTitle) {
                     // Skip if it looks like a field name (snake_case)
                     if (Str::contains($sectionTitle, '_')) {
                         continue;
                     }
 
+                    // Check if this section has a description
+                    $hasDescription = $this->hasLayoutDescription($content, $sectionTitle, $component);
+
+                    // Generate unique translation key
+                    $baseKey = $this->generateTranslationKey(Str::snake($sectionTitle));
+                    $uniqueKey = $this->generateUniqueTranslationKey($baseKey, $titleCounts);
+
                     $sections[] = [
                         'title' => $sectionTitle,
                         'component' => $component,
-                        'translation_key' => $this->generateTranslationKey(Str::snake($sectionTitle)),
+                        'translation_key' => $uniqueKey,
+                        'has_translation' => false,
+                        'has_description' => $hasDescription,
+                    ];
+                }
+            }
+
+            // Match patterns like: Section::make(__('translation.key')) - translation functions
+            $translationPattern = "/{$component}::make\(__\(['\"]([^'\"]+)['\"]\)\)/";
+            preg_match_all($translationPattern, $content, $translationMatches);
+
+            if (! empty($translationMatches[1])) {
+                foreach ($translationMatches[1] as $translationKey) {
+                    // Extract the actual title from the translation key for display purposes
+                    $title = $this->extractTitleFromTranslationKey($translationKey);
+
+                    // Check if this section has a description by looking for the full make() call with translation key
+                    $hasDescription = $this->hasLayoutDescriptionWithTranslationKey($content, $translationKey, $component);
+
+                    // Generate unique translation key
+                    $baseKey = $this->generateTranslationKey($title);
+                    $uniqueKey = $this->generateUniqueTranslationKey($baseKey, $titleCounts);
+
+                    $sections[] = [
+                        'title' => $title,
+                        'component' => $component,
+                        'translation_key' => $uniqueKey,
+                        'original_translation_key' => $translationKey, // Keep the original for reference
+                        'has_translation' => true,
+                        'has_description' => $hasDescription,
                     ];
                 }
             }
@@ -359,6 +440,198 @@ class ResourceAnalyzer
         return str_contains($fieldContent, '->label(');
     }
 
+    protected function hasDescription(string $content, string $fieldName, string $component): bool
+    {
+        // Look for ->description() after the make() call for this specific field
+        // Similar to hasLabel but looking for ->description(
+
+        // First, find the make() call for this field
+        $makePattern = "/{$component}::make\(['\"]".preg_quote($fieldName, '/')."['\"]\)/";
+
+        if (! preg_match($makePattern, $content, $matches, PREG_OFFSET_CAPTURE)) {
+            return false;
+        }
+
+        $startPos = $matches[0][1] + strlen($matches[0][0]);
+
+        // Find the next make() call or closing bracket/paren that ends the field
+        // Match: newline + whitespace + (component::make OR ] OR })
+        $endPattern = "/\n\s*(?:\w+::make\(|[\]\}]\))/";
+
+        if (preg_match($endPattern, $content, $endMatches, PREG_OFFSET_CAPTURE, $startPos)) {
+            $endPos = $endMatches[0][1];
+        } else {
+            $endPos = strlen($content);
+        }
+
+        // Extract just this field's definition
+        $fieldContent = substr($content, $startPos, $endPos - $startPos);
+
+        // Check if this field's content contains ->description(
+        return str_contains($fieldContent, '->description(');
+    }
+
+    protected function hasDefault(string $content, string $fieldName, string $component): bool
+    {
+        // Look for ->default() after the make() call for this specific field
+        $makePattern = "/{$component}::make\(['\"]".preg_quote($fieldName, '/')."['\"]\)/";
+
+        if (! preg_match($makePattern, $content, $matches, PREG_OFFSET_CAPTURE)) {
+            return false;
+        }
+
+        $startPos = $matches[0][1] + strlen($matches[0][0]);
+
+        // Find the next make() call or closing bracket/paren that ends the field
+        $endPattern = "/\n\s*(?:\w+::make\(|[\]\}]\))/";
+
+        if (preg_match($endPattern, $content, $endMatches, PREG_OFFSET_CAPTURE, $startPos)) {
+            $endPos = $endMatches[0][1];
+        } else {
+            $endPos = strlen($content);
+        }
+
+        // Extract just this field's definition
+        $fieldContent = substr($content, $startPos, $endPos - $startPos);
+
+        // Check if this field's content contains ->default(
+        return str_contains($fieldContent, '->default(');
+    }
+
+    protected function analyzeSelectOptions(string $content, string $fieldName, string $component): array
+    {
+        $options = [];
+
+        // Look for ->options([...]) after the make() call for this specific field
+        $makePattern = "/{$component}::make\(['\"]".preg_quote($fieldName, '/')."['\"]\)/";
+
+        if (! preg_match($makePattern, $content, $matches, PREG_OFFSET_CAPTURE)) {
+            return $options;
+        }
+
+        $startPos = $matches[0][1] + strlen($matches[0][0]);
+
+        // Find the next make() call that ends the field
+        // Look for a newline followed by whitespace and then a component make() call
+        // This ensures we don't match closing brackets within the field definition
+        $endPattern = "/\n\s+\w+::make\(/";
+
+        if (preg_match($endPattern, $content, $endMatches, PREG_OFFSET_CAPTURE, $startPos)) {
+            $endPos = $endMatches[0][1];
+        } else {
+            $endPos = strlen($content);
+        }
+
+        // Extract just this field's definition
+        $fieldContent = substr($content, $startPos, $endPos - $startPos);
+
+        // Look for ->options([...]) pattern - handle multiline arrays
+        if (preg_match('/->options\s*\(\s*\[(.*?)\]\s*\)/s', $fieldContent, $optionsMatch)) {
+            $optionsContent = $optionsMatch[1];
+
+            // Parse the options array content
+            // Look for patterns like: 'key' => 'value' or 'key' => __('translation')
+            // Also handle numeric keys like: 0 => __('no'), 1 => __('yes')
+            // Handle multiline format with proper whitespace and indentation
+            preg_match_all("/(?:['\"]([^'\"]+)['\"]|(\d+))\s*=>\s*(?:['\"]([^'\"]+)['\"]|__\(['\"]([^'\"]+)['\"]\))/", $optionsContent, $optionMatches, PREG_SET_ORDER);
+
+            foreach ($optionMatches as $optionMatch) {
+                $key = $optionMatch[1] ?: $optionMatch[2]; // String key or numeric key
+                $value = $optionMatch[3] ?: $optionMatch[4] ?: $key; // Use value, translation key, or key as fallback
+                $isTranslation = isset($optionMatch[4]); // Check if it's a translation function
+
+                // For boolean select fields (0/1), use the display value for translation key
+                if ($isTranslation) {
+                    // Already has translation, extract the key part
+                    $translationKey = $value;
+                } else {
+                    $translationKey = $this->generateTranslationKey($key);
+
+                    // Special handling for boolean select fields
+                    if (is_numeric($key) && ! empty($value)) {
+                        // Use the display value (like 'No', 'Yes') instead of the numeric key
+                        $translationKey = $this->generateTranslationKey($value);
+                    }
+                }
+
+                $options[] = [
+                    'key' => $key,
+                    'value' => $value,
+                    'is_translation' => $isTranslation,
+                    'translation_key' => $translationKey,
+                ];
+            }
+        }
+
+        return $options;
+    }
+
+    protected function hasLayoutDescription(string $content, string $title, string $component): bool
+    {
+        // Look for ->description() after the make() call for this specific layout component
+        // Similar to hasDescription but for layout components
+
+        // First, try to find the make() call with hardcoded string
+        $makePattern = "/{$component}::make\(['\"]".preg_quote($title, '/')."['\"]\)/";
+        $startPos = 0;
+
+        if (preg_match($makePattern, $content, $matches, PREG_OFFSET_CAPTURE)) {
+            $startPos = $matches[0][1] + strlen($matches[0][0]);
+        } else {
+            // Try to find make() call with translation key
+            $translationPattern = "/{$component}::make\(__\(['\"][^'\"]*['\"]\)\)/";
+            if (preg_match($translationPattern, $content, $matches, PREG_OFFSET_CAPTURE)) {
+                $startPos = $matches[0][1] + strlen($matches[0][0]);
+            } else {
+                return false;
+            }
+        }
+
+        // Find the next make() call or closing bracket/paren that ends the component
+        // Match: newline + whitespace + (component::make OR ] OR })
+        $endPattern = "/\n\s*(?:\w+::make\(|[\]\}]\))/";
+
+        if (preg_match($endPattern, $content, $endMatches, PREG_OFFSET_CAPTURE, $startPos)) {
+            $endPos = $endMatches[0][1];
+        } else {
+            $endPos = strlen($content);
+        }
+
+        // Extract just this component's definition
+        $componentContent = substr($content, $startPos, $endPos - $startPos);
+
+        // Check if this component's content contains ->description(
+        return str_contains($componentContent, '->description(');
+    }
+
+    protected function hasLayoutDescriptionWithTranslationKey(string $content, string $translationKey, string $component): bool
+    {
+        // Look for ->description() after a make() call with a specific translation key
+        $escapedKey = preg_quote($translationKey, '/');
+        $makePattern = "/{$component}::make\(__\(['\"]".$escapedKey."['\"]\)\)/";
+
+        if (! preg_match($makePattern, $content, $matches, PREG_OFFSET_CAPTURE)) {
+            return false;
+        }
+
+        $startPos = $matches[0][1] + strlen($matches[0][0]);
+
+        // Find the next make() call or closing bracket/paren that ends the component
+        $endPattern = "/\n\s*(?:\w+::make\(|[\]\}]\))/";
+
+        if (preg_match($endPattern, $content, $endMatches, PREG_OFFSET_CAPTURE, $startPos)) {
+            $endPos = $endMatches[0][1];
+        } else {
+            $endPos = strlen($content);
+        }
+
+        // Extract just this component's definition
+        $componentContent = substr($content, $startPos, $endPos - $startPos);
+
+        // Check if this component's content contains ->description(
+        return str_contains($componentContent, '->description(');
+    }
+
     protected function generateLabel(string $fieldName): string
     {
         $strategy = config('filament-localization.label_generation', 'title_case');
@@ -388,6 +661,34 @@ class ResourceAnalyzer
     protected function generateTranslationKey(string $fieldName): string
     {
         return Str::snake($fieldName);
+    }
+
+    protected function generateUniqueTranslationKey(string $baseKey, array &$titleCounts): string
+    {
+        if (! isset($titleCounts[$baseKey])) {
+            $titleCounts[$baseKey] = 0;
+        }
+
+        $titleCounts[$baseKey]++;
+
+        // If this is the first occurrence, use the base key
+        if ($titleCounts[$baseKey] === 1) {
+            return $baseKey;
+        }
+
+        // For subsequent occurrences, append a number
+        return $baseKey.'_'.$titleCounts[$baseKey];
+    }
+
+    protected function extractTitleFromTranslationKey(string $translationKey): string
+    {
+        // Extract the last part of the translation key for display
+        // e.g., 'filament/doctor.details' -> 'details'
+        $parts = explode('.', $translationKey);
+        $lastPart = end($parts);
+
+        // Convert snake_case to title case for display
+        return Str::title(str_replace('_', ' ', $lastPart));
     }
 
     protected function detectSchemaFiles(string $content, string $resourceClass): array

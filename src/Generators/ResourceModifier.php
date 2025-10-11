@@ -126,6 +126,107 @@ class ResourceModifier
                     $this->statistics->incrementFieldsLocalized();
                 }
             }
+
+            // Handle descriptions - only modify if they already exist
+            if ($field['has_description']) {
+                $escapedFieldName = preg_quote($fieldName, '/');
+                $descriptionKey = $this->buildTranslationKey($analysis, $panel, $field['translation_key'].'_description');
+
+                // Pattern: Find make('field') followed by ->description() anywhere after it
+                $pattern = "/({$component}::make\(['\"]".$escapedFieldName."['\"]\)(?:.*?))->description\((?:[^()]*|\([^()]*\))*\)/s";
+                $replacement = "$1->description(__('$descriptionKey'))";
+
+                $newContent = preg_replace($pattern, $replacement, $content, 1);
+
+                // If replacement worked, use it
+                if ($newContent !== $content) {
+                    $content = $newContent;
+                    $this->statistics->incrementFieldsLocalized();
+                }
+            }
+
+            // Handle Select options and default values
+            if ($component === 'Select' && ! empty($field['select_options'])) {
+                // Check if all options already have proper translations
+                $allOptionsHaveTranslations = true;
+                foreach ($field['select_options'] as $option) {
+                    if (! $option['is_translation']) {
+                        $allOptionsHaveTranslations = false;
+                        break;
+                    }
+                }
+
+                // Only modify if not all options have translations
+                if (! $allOptionsHaveTranslations) {
+                    $content = $this->modifySelectOptions($content, $field, $analysis, $panel);
+                }
+            }
+
+            // Handle default values for any field
+            if ($field['has_default']) {
+                $content = $this->modifyDefaultValue($content, $field, $analysis, $panel);
+            }
+        }
+
+        return $content;
+    }
+
+    protected function modifySelectOptions(string $content, array $field, array $analysis, $panel): string
+    {
+        $fieldName = $field['name'];
+        $component = $field['component'];
+        $escapedFieldName = preg_quote($fieldName, '/');
+
+        // Find the Select component and its options
+        $pattern = "/({$component}::make\(['\"]".$escapedFieldName."['\"]\)(?:.*?))->options\s*\(\s*\[(.*?)\]\s*\)/s";
+
+        if (preg_match($pattern, $content, $matches)) {
+            $beforeOptions = $matches[1];
+            $optionsContent = $matches[2];
+
+            // Build new options array with translation keys
+            $newOptions = [];
+            foreach ($field['select_options'] as $option) {
+                $key = $option['key'];
+                // Use the translation_key from the option (which now handles boolean fields correctly)
+                $optionKey = $field['translation_key'].'.'.$option['translation_key'];
+                $translationKey = $this->buildTranslationKey($analysis, $panel, $optionKey);
+
+                if ($option['is_translation']) {
+                    // Already has translation, update to new key
+                    $newOptions[] = "'{$key}' => __('{$translationKey}')";
+                } else {
+                    // Plain value, add translation
+                    $newOptions[] = "'{$key}' => __('{$translationKey}')";
+                }
+            }
+
+            $newOptionsContent = '['.implode(', ', $newOptions).']';
+            $replacement = $beforeOptions.'->options('.$newOptionsContent.')';
+
+            $content = preg_replace($pattern, $replacement, $content, 1);
+        }
+
+        return $content;
+    }
+
+    protected function modifyDefaultValue(string $content, array $field, array $analysis, $panel): string
+    {
+        $fieldName = $field['name'];
+        $component = $field['component'];
+        $escapedFieldName = preg_quote($fieldName, '/');
+        $defaultKey = $this->buildTranslationKey($analysis, $panel, $field['translation_key'].'_default');
+
+        // Pattern: Find make('field') followed by ->default() anywhere after it
+        $pattern = "/({$component}::make\(['\"]".$escapedFieldName."['\"]\)(?:.*?))->default\((?:[^()]*|\([^()]*\))*\)/s";
+        $replacement = "$1->default(__('$defaultKey'))";
+
+        $newContent = preg_replace($pattern, $replacement, $content, 1);
+
+        // If replacement worked, use it
+        if ($newContent !== $content) {
+            $content = $newContent;
+            $this->statistics->incrementFieldsLocalized();
         }
 
         return $content;
@@ -220,20 +321,46 @@ class ResourceModifier
 
     protected function modifySections(string $content, array $sections, array $analysis, $panel): string
     {
+        // Group sections by their original key to handle duplicates properly
+        $sectionsByOriginalKey = [];
         foreach ($sections as $section) {
-            $component = $section['component'];
-            $title = $section['title'];
-            $translationKey = $this->buildTranslationKey($analysis, $panel, $section['translation_key']);
+            $originalKey = $section['original_translation_key'] ?? $section['title'];
+            $sectionsByOriginalKey[$originalKey][] = $section;
+        }
 
-            // Replace hardcoded section titles with translation keys
-            $pattern = "/({$component}::make\(['\"])".preg_quote($title, '/').("['\"]\))/");
-            $replacement = "$1' . __('$translationKey') . '$2";
+        foreach ($sectionsByOriginalKey as $originalKey => $sectionGroup) {
+            foreach ($sectionGroup as $index => $section) {
+                $component = $section['component'];
+                $title = $section['title'];
+                $hasTranslation = $section['has_translation'] ?? false;
+                $translationKey = $this->buildTranslationKey($analysis, $panel, $section['translation_key']);
 
-            // Better approach: replace the entire make call
-            $pattern = "/{$component}::make\(['\"]".preg_quote($title, '/')."['\"]\)/";
-            $replacement = "{$component}::make(__('$translationKey'))";
+                // Replace hardcoded section titles with translation keys
+                $pattern = "/{$component}::make\(['\"]".preg_quote($title, '/')."['\"]\)/";
+                $replacement = "{$component}::make(__('$translationKey'))";
 
-            $content = preg_replace($pattern, $replacement, $content, 1);
+                // Use limit of 1 to replace only one occurrence at a time
+                $content = preg_replace($pattern, $replacement, $content, 1);
+
+                // Handle descriptions for layout components - only modify if they already exist
+                if (isset($section['has_description']) && $section['has_description']) {
+                    $descriptionKey = $this->buildTranslationKey($analysis, $panel, $section['translation_key'].'_description');
+
+                    if ($hasTranslation) {
+                        // Update existing description with translation key
+                        $escapedOriginalKey = preg_quote($originalKey, '/');
+                        $pattern = "/{$component}::make\(__\(['\"]".$escapedOriginalKey."['\"]\)\)(?:.*?)->description\((?:[^()]*|\([^()]*\))*\)/s";
+                        $replacement = "{$component}::make(__('$translationKey'))->description(__('$descriptionKey'))";
+                    } else {
+                        // Update hardcoded title with description
+                        $pattern = "/{$component}::make\(['\"]".preg_quote($title, '/')."['\"]\)(?:.*?)->description\((?:[^()]*|\([^()]*\))*\)/s";
+                        $replacement = "{$component}::make(__('$translationKey'))->description(__('$descriptionKey'))";
+                    }
+
+                    // Use limit of 1 to replace only one occurrence at a time
+                    $content = preg_replace($pattern, $replacement, $content, 1);
+                }
+            }
         }
 
         return $content;
@@ -347,10 +474,15 @@ class ResourceModifier
         $modelLabelKey = $this->buildTranslationKey($analysis, $panel, 'model_label');
         $pluralModelLabelKey = $this->buildTranslationKey($analysis, $panel, 'plural_model_label');
 
-        // Check if resource already has these labels
+        // Check if resource already has these labels and if they have hardcoded values
         $hasNavigationLabel = preg_match('/protected\s+static\s+\?string\s+\$navigationLabel\s*=/', $content);
         $hasModelLabel = preg_match('/protected\s+static\s+\?string\s+\$modelLabel\s*=/', $content);
         $hasPluralModelLabel = preg_match('/protected\s+static\s+\?string\s+\$pluralModelLabel\s*=/', $content);
+
+        // Check if labels have hardcoded values (not null)
+        $hasHardcodedNavigationLabel = preg_match('/protected\s+static\s+\?string\s+\$navigationLabel\s*=\s*[\'"][^\'"]+[\'"]/', $content);
+        $hasHardcodedModelLabel = preg_match('/protected\s+static\s+\?string\s+\$modelLabel\s*=\s*[\'"][^\'"]+[\'"]/', $content);
+        $hasHardcodedPluralModelLabel = preg_match('/protected\s+static\s+\?string\s+\$pluralModelLabel\s*=\s*[\'"][^\'"]+[\'"]/', $content);
 
         // Find the position after the $model property to insert labels
         $pattern = '/(protected\s+static\s+\?string\s+\$model\s*=\s*[^;]+;)/';
@@ -360,28 +492,28 @@ class ResourceModifier
 
             $labelsToAdd = [];
 
-            // Add navigation label if it doesn't exist OR if force is enabled
-            if (! $hasNavigationLabel || $force) {
-                if ($force && $hasNavigationLabel) {
-                    // Remove existing navigation label first
+            // Always add/update navigation label if it has hardcoded values or doesn't exist
+            if (! $hasNavigationLabel || $hasHardcodedNavigationLabel) {
+                if ($hasNavigationLabel) {
+                    // Remove existing navigation label first (whether hardcoded or null)
                     $content = preg_replace('/protected\s+static\s+\?string\s+\$navigationLabel\s*=\s*[^;]+;\s*/', '', $content);
                 }
                 $labelsToAdd[] = "\n\n    protected static ?string \$navigationLabel = null;";
             }
 
-            // Add model label if it doesn't exist OR if force is enabled
-            if (! $hasModelLabel || $force) {
-                if ($force && $hasModelLabel) {
-                    // Remove existing model label first
+            // Always add/update model label if it has hardcoded values or doesn't exist
+            if (! $hasModelLabel || $hasHardcodedModelLabel) {
+                if ($hasModelLabel) {
+                    // Remove existing model label first (whether hardcoded or null)
                     $content = preg_replace('/protected\s+static\s+\?string\s+\$modelLabel\s*=\s*[^;]+;\s*/', '', $content);
                 }
                 $labelsToAdd[] = "\n\n    protected static ?string \$modelLabel = null;";
             }
 
-            // Add plural model label if it doesn't exist OR if force is enabled
-            if (! $hasPluralModelLabel || $force) {
-                if ($force && $hasPluralModelLabel) {
-                    // Remove existing plural model label first
+            // Always add/update plural model label if it has hardcoded values or doesn't exist
+            if (! $hasPluralModelLabel || $hasHardcodedPluralModelLabel) {
+                if ($hasPluralModelLabel) {
+                    // Remove existing plural model label first (whether hardcoded or null)
                     $content = preg_replace('/protected\s+static\s+\?string\s+\$pluralModelLabel\s*=\s*[^;]+;\s*/', '', $content);
                 }
                 $labelsToAdd[] = "\n\n    protected static ?string \$pluralModelLabel = null;";
@@ -392,8 +524,8 @@ class ResourceModifier
             }
         }
 
-        // Now handle the getter methods
-        $content = $this->updateResourceMethods($content, $navigationLabelKey, $modelLabelKey, $pluralModelLabelKey, $force);
+        // Now handle the getter methods - always update them if we're localizing
+        $content = $this->updateResourceMethods($content, $navigationLabelKey, $modelLabelKey, $pluralModelLabelKey, true);
 
         return $content;
     }
@@ -419,11 +551,8 @@ class ResourceModifier
         $newMethod = "    public static function {$methodName}(): string\n    {\n        return __('{$translationKey}');\n    }";
 
         if (preg_match($methodPattern, $content)) {
-            if ($force) {
-                // Replace existing method
-                $content = preg_replace($methodPattern, $newMethod, $content);
-            }
-            // If not force and method exists, do nothing
+            // Always replace existing method when localizing to ensure correct translation keys
+            $content = preg_replace($methodPattern, $newMethod, $content);
         } else {
             // Method doesn't exist, add it before the closing brace
             $pattern = '/(\n\s*}\s*)$/';

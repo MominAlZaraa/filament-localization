@@ -64,6 +64,9 @@ class LocalizationService
             // Modify the resource file to use translation keys
             if (! $dryRun) {
                 $this->resourceModifier->modify($resourceClass, $analysis, $panel, $force);
+
+                // Handle static properties for getModelLabel method
+                $this->translationGenerator->handleStaticPropertiesForGetModelLabel($analysis, $dryRun);
             }
 
             // Update statistics

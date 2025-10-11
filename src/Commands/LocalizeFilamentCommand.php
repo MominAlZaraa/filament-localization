@@ -431,7 +431,7 @@ class LocalizeFilamentCommand extends Command
             }
 
             // If still not resolved, assume it's in the same namespace as the resource
-            if (! str_contains($pageClass, '\\')) {
+            if (strpos($pageClass, '\\') === false) {
                 $resourceNamespace = (new \ReflectionClass($resourceClass))->getNamespaceName();
 
                 return $resourceNamespace.'\\Pages\\'.$pageClass;
@@ -513,7 +513,7 @@ class LocalizeFilamentCommand extends Command
             }
 
             // If still not resolved, assume it's in the same namespace as the resource
-            if (! str_contains($relationManagerClass, '\\')) {
+            if (strpos($relationManagerClass, '\\') === false) {
                 $resourceNamespace = (new \ReflectionClass($resourceClass))->getNamespaceName();
 
                 return $resourceNamespace.'\\'.$relationManagerClass;

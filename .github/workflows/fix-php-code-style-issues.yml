@@ -37,10 +37,6 @@ jobs:
       - name: Fix PHP code style issues
         run: vendor/bin/pint
 
-      - name: Discard local changes before pull/rebase
-        run: git reset --hard HEAD
-        if: github.event_name == 'push'
-
       - name: Pull latest changes and rebase
         run: |
           git config --global user.email "github-actions[bot]@users.noreply.github.com"
