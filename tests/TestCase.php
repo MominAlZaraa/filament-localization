@@ -11,6 +11,15 @@ class TestCase extends Orchestra
     {
         return [
             FilamentLocalizationServiceProvider::class,
+            \Livewire\LivewireServiceProvider::class,
+            \Filament\FilamentServiceProvider::class,
+            \Filament\Forms\FormsServiceProvider::class,
+            \Filament\Tables\TablesServiceProvider::class,
+            \Filament\Actions\ActionsServiceProvider::class,
+            \Filament\Infolists\InfolistsServiceProvider::class,
+            \Filament\Notifications\NotificationsServiceProvider::class,
+            \Filament\Support\SupportServiceProvider::class,
+            \Filament\Widgets\WidgetsServiceProvider::class,
         ];
     }
 
@@ -22,6 +31,15 @@ class TestCase extends Orchestra
             'driver' => 'sqlite',
             'database' => ':memory:',
             'prefix' => '',
+        ]);
+
+        // Set DeepL API key in the correct config location
+        $app['config']->set('filament-localization.deepl.api_key', 'test-key-for-tests');
+
+        // Set up Filament configuration for testing
+        $app['config']->set('filament', [
+            'default_filesystem_disk' => 'public',
+            'default_theme_mode' => 'system',
         ]);
     }
 }

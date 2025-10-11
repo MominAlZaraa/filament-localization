@@ -1,42 +1,20 @@
 name: Code Style
 
 on:
-  push:
-    branches: [main]
   pull_request:
-    branches: [main]
+  push:
+    branches:
+      - main
 
 jobs:
-  code-style:
+  pint:
     runs-on: ubuntu-latest
-    name: Code Style Check
-    permissions:
-      contents: write
-
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v3
+      - uses: shivammathur/setup-php@v2
         with:
-          token: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Setup PHP
-        uses: shivammathur/setup-php@v2
-        with:
-          php-version: '8.3'
-          extensions: dom, curl, libxml, mbstring, zip, pcntl, pdo, sqlite, pdo_sqlite, bcmath, soap, intl, gd, exif, iconv
-          coverage: none
-
+          php-version: '8.2'
       - name: Install dependencies
-        run: composer install --prefer-dist --no-interaction
-
-      - name: Run Pint (Code Style Fixer)
-        run: vendor/bin/pint
-
-      - name: Commit style fixes
-        uses: stefanzweifel/git-auto-commit-action@v5
-        with:
-          commit_message: "style: fix code style issues"
-        if: github.event_name == 'push'
-
-      - name: Check if code style is correct
-        run: vendor/bin/pint --test
+        run: composer install --no-interaction --no-progress --prefer-dist
+      - name: Run Pint
+        run: ./vendor/bin/pint src/ tests/
