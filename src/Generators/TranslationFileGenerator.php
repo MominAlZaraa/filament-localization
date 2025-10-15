@@ -330,6 +330,58 @@ class TranslationFileGenerator
         $this->statistics->incrementTranslationKeysAdded(count($translations));
     }
 
+    public function generateWidgetTranslations(array $analysis, string $panelId, string $locale, bool $dryRun = false): void
+    {
+        $structure = config('filament-localization.structure', 'panel-based');
+
+        $translationPath = $this->getWidgetTranslationPath($analysis, $panelId, $locale, $structure);
+        $translations = $this->buildWidgetTranslations($analysis);
+
+        if (empty($translations)) {
+            return;
+        }
+
+        if ($dryRun) {
+            return;
+        }
+
+        // Ensure directory exists
+        $directory = dirname($translationPath);
+        if (! File::exists($directory)) {
+            File::makeDirectory($directory, 0755, true);
+        }
+
+        // Check if file exists before writing
+        $fileExists = File::exists($translationPath);
+
+        // Load existing translations if file exists
+        $existingTranslations = [];
+        if ($fileExists) {
+            $existingTranslations = include $translationPath;
+        }
+
+        // Merge translations intelligently - preserve existing translations and only add missing keys
+        $mergedTranslations = $this->mergeTranslationsIntelligently($existingTranslations, $translations);
+
+        // Sort translations alphabetically
+        ksort($mergedTranslations);
+
+        // Generate PHP array content
+        $content = $this->generatePhpArrayContent($mergedTranslations);
+
+        // Write to file
+        File::put($translationPath, $content);
+
+        // Update statistics
+        if (! $fileExists) {
+            $this->statistics->incrementTranslationFilesCreated();
+        } else {
+            $this->statistics->incrementFilesModified();
+        }
+
+        $this->statistics->incrementTranslationKeysAdded(count($translations));
+    }
+
     protected function getPageTranslationPath(array $analysis, string $panelId, string $locale, string $structure): string
     {
         $basePath = lang_path($locale);
@@ -340,6 +392,19 @@ class TranslationFileGenerator
             'nested' => "{$basePath}/{$prefix}/" . Str::snake($analysis['page_name']) . '.php',
             'panel-based' => "{$basePath}/{$prefix}/{$panelId}/" . Str::snake($analysis['page_name']) . '.php',
             default => "{$basePath}/{$prefix}/{$panelId}/" . Str::snake($analysis['page_name']) . '.php',
+        };
+    }
+
+    protected function getWidgetTranslationPath(array $analysis, string $panelId, string $locale, string $structure): string
+    {
+        $basePath = lang_path($locale);
+        $prefix = config('filament-localization.translation_key_prefix', 'filament');
+
+        return match ($structure) {
+            'flat' => "{$basePath}/{$prefix}.php",
+            'nested' => "{$basePath}/{$prefix}/" . Str::snake($analysis['widget_name']) . '.php',
+            'panel-based' => "{$basePath}/{$prefix}/{$panelId}/" . Str::snake($analysis['widget_name']) . '.php',
+            default => "{$basePath}/{$prefix}/{$panelId}/" . Str::snake($analysis['widget_name']) . '.php',
         };
     }
 
@@ -421,6 +486,20 @@ class TranslationFileGenerator
             $pageName = $analysis['page_name'];
             $defaultTitle = $this->generateDefaultTitle($pageName);
             $translations['title'] = $defaultTitle;
+        }
+
+        return $translations;
+    }
+
+    protected function buildWidgetTranslations(array $analysis): array
+    {
+        $translations = [];
+
+        // Add stat translations
+        foreach ($analysis['stats'] as $stat) {
+            if (! $stat['has_translation']) {
+                $translations[$stat['translation_key']] = $stat['value'];
+            }
         }
 
         return $translations;

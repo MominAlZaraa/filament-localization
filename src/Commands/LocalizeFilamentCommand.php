@@ -230,9 +230,10 @@ class LocalizeFilamentCommand extends Command
         $resources = $panel->getResources();
         $pages = $this->getPanelPages($panel);
         $relationManagers = $this->getPanelRelationManagers($panel);
+        $widgets = $this->getPanelWidgets($panel);
 
-        // Calculate total items including resource pages
-        $totalItems = count($resources) + count($pages) + count($relationManagers);
+        // Calculate total items including resource pages and widgets
+        $totalItems = count($resources) + count($pages) + count($relationManagers) + count($widgets);
         $resourcePagesCount = 0;
         foreach ($resources as $resource) {
             $resourcePages = $this->getResourcePages($resource);
@@ -243,7 +244,7 @@ class LocalizeFilamentCommand extends Command
         // $this->info("Found {$resourcePagesCount} resource pages to process");
 
         if ($totalItems === 0) {
-            $this->warn("  ⚠️  No resources, pages, or relation managers found in panel: {$panelId}");
+            $this->warn("  ⚠️  No resources, pages, relation managers, or widgets found in panel: {$panelId}");
 
             return;
         }
@@ -291,6 +292,21 @@ class LocalizeFilamentCommand extends Command
 
             $this->localizationService->processPage(
                 $page,
+                $panel,
+                $locales,
+                $this->option('dry-run')
+            );
+
+            $progressBar->advance();
+        }
+
+        // Process widgets
+        foreach ($widgets as $widget) {
+            $widgetName = class_basename($widget);
+            $progressBar->setMessage("Processing widget {$widgetName}...");
+
+            $this->localizationService->processWidget(
+                $widget,
                 $panel,
                 $locales,
                 $this->option('dry-run')
@@ -490,6 +506,141 @@ class LocalizeFilamentCommand extends Command
         }
 
         return $relationManagers;
+    }
+
+    protected function getPanelWidgets($panel): array
+    {
+        $widgets = [];
+
+        try {
+            // Get all resources for this panel
+            $resources = $panel->getResources();
+
+            foreach ($resources as $resource) {
+                // Get widgets from the resource
+                $resourceWidgets = $this->getResourceWidgets($resource);
+                $widgets = array_merge($widgets, $resourceWidgets);
+            }
+
+            // Get widgets from pages (check ALL pages, not just custom pages)
+            $allPages = $panel->getPages();
+
+            foreach ($allPages as $page) {
+                $pageWidgets = $this->getPageWidgets($page);
+                $widgets = array_merge($widgets, $pageWidgets);
+            }
+
+            // Remove duplicates
+            $widgets = array_unique($widgets);
+        } catch (\Exception $e) {
+            // Log the error for debugging
+            $this->error("Error getting widgets: " . $e->getMessage());
+        }
+
+        return $widgets;
+    }
+
+    protected function getResourceWidgets(string $resourceClass): array
+    {
+        $widgets = [];
+
+        try {
+            $reflection = new \ReflectionClass($resourceClass);
+            $filePath = $reflection->getFileName();
+
+            if (! $filePath || ! File::exists($filePath)) {
+                return $widgets;
+            }
+
+            $content = File::get($filePath);
+
+            // Look for getWidgets method
+            if (preg_match('/public\s+function\s+getWidgets\s*\(\s*\)\s*:\s*array\s*\{([^}]+)\}/s', $content, $matches)) {
+                $widgetsContent = $matches[1];
+
+                // Extract widget class names
+                if (preg_match_all('/([A-Z][a-zA-Z0-9_]*Widget::class)/', $widgetsContent, $widgetMatches)) {
+                    foreach ($widgetMatches[1] as $widgetClass) {
+                        $resolvedClass = $this->resolveWidgetClass($widgetClass, $resourceClass, $content);
+                        if ($resolvedClass) {
+                            $widgets[] = $resolvedClass;
+                        }
+                    }
+                }
+            }
+        } catch (\Exception $e) {
+            // Silently fail if we can't analyze the resource
+        }
+
+        return $widgets;
+    }
+
+    protected function getPageWidgets(string $pageClass): array
+    {
+        $widgets = [];
+
+        try {
+            $reflection = new \ReflectionClass($pageClass);
+            $filePath = $reflection->getFileName();
+
+            if (! $filePath || ! File::exists($filePath)) {
+                return $widgets;
+            }
+
+            $content = File::get($filePath);
+
+            // Look for getWidgets method
+            if (preg_match('/public\s+function\s+getWidgets\s*\(\s*\)\s*:\s*array\s*\{([^}]+)\}/s', $content, $matches)) {
+                $widgetsContent = $matches[1];
+
+                // Extract widget class names
+                if (preg_match_all('/([A-Z][a-zA-Z0-9_]*Widget)::class/', $widgetsContent, $widgetMatches)) {
+                    foreach ($widgetMatches[1] as $widgetClass) {
+                        $resolvedClass = $this->resolveWidgetClass($widgetClass, $pageClass, $content);
+                        if ($resolvedClass) {
+                            $widgets[] = $resolvedClass;
+                        }
+                    }
+                }
+            }
+        } catch (\Exception $e) {
+            // Silently fail if we can't analyze the page
+        }
+
+        return $widgets;
+    }
+
+    protected function resolveWidgetClass(string $widgetClass, string $parentClass, string $content): ?string
+    {
+        // If the class name doesn't have a namespace, we need to resolve it from the use statements
+        if (! str_contains($widgetClass, '\\')) {
+            // Extract use statements from the content
+            preg_match_all('/use\s+([^;]+);/', $content, $useMatches);
+
+            foreach ($useMatches[1] as $useStatement) {
+                if (str_ends_with($useStatement, '\\' . $widgetClass) || $useStatement === $widgetClass) {
+                    return $useStatement;
+                }
+
+                // Handle aliased imports (use X as Y)
+                if (preg_match('/(.+)\s+as\s+(.+)/', $useStatement, $aliasMatch)) {
+                    if (trim($aliasMatch[2]) === $widgetClass) {
+                        return trim($aliasMatch[1]);
+                    }
+                }
+            }
+
+            // If not found in use statements, try to construct the namespace from the parent class
+            $parentNamespace = (new \ReflectionClass($parentClass))->getNamespaceName();
+            $widgetNamespace = str_replace(['Resources', 'Pages'], 'Widgets', $parentNamespace);
+            $fullWidgetClass = $widgetNamespace . '\\' . $widgetClass;
+
+            if (class_exists($fullWidgetClass)) {
+                return $fullWidgetClass;
+            }
+        }
+
+        return class_exists($widgetClass) ? $widgetClass : null;
     }
 
     protected function resolveRelationManagerClass(string $relationManagerClass, string $resourceClass, string $content): ?string
