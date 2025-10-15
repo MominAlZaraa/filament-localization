@@ -124,6 +124,18 @@ class PageAnalyzer
             // Custom HTML content
             '/->html\(/',
             '/->state\(/',
+
+            // Static properties with hardcoded strings
+            '/protected\s+static\s+\?string\s+\$title\s*=\s*[\'"][^\'"]+[\'"]/',
+            '/protected\s+static\s+\?string\s+\$navigationLabel\s*=\s*[\'"][^\'"]+[\'"]/',
+            '/protected\s+static\s+\?string\s+\$navigationIcon\s*=\s*[\'"][^\'"]+[\'"]/',
+            '/protected\s+static\s+\?string\s+\$navigationGroup\s*=\s*[\'"][^\'"]+[\'"]/',
+
+            // Method returns with hardcoded strings
+            '/public\s+(?:static\s+)?function\s+getTitle\s*\([^)]*\)\s*:\s*[^{]*{[^}]*return\s+[\'"][^\'"]+[\'"]/',
+            '/public\s+(?:static\s+)?function\s+getHeading\s*\([^)]*\)\s*:\s*[^{]*{[^}]*return\s+[\'"][^\'"]+[\'"]/',
+            '/public\s+(?:static\s+)?function\s+getSubheading\s*\([^)]*\)\s*:\s*[^{]*{[^}]*return\s+[\'"][^\'"]+[\'"]/',
+            '/public\s+(?:static\s+)?function\s+getNavigationLabel\s*\([^)]*\)\s*:\s*[^{]*{[^}]*return\s+[\'"][^\'"]+[\'"]/',
         ];
 
         foreach ($patterns as $pattern) {
@@ -264,7 +276,7 @@ class PageAnalyzer
     protected function hasLabel(string $content, string $fieldName, string $component): bool
     {
         // Look for ->label() after the make() call for this specific field
-        $makePattern = "/(?<![:\w]){$component}::make\(['\"]".preg_quote($fieldName, '/')."['\"]\)/";
+        $makePattern = "/(?<![:\w]){$component}::make\(['\"]" . preg_quote($fieldName, '/') . "['\"]\)/";
 
         if (! preg_match($makePattern, $content, $matches, PREG_OFFSET_CAPTURE)) {
             return false;
@@ -330,7 +342,7 @@ class PageAnalyzer
         ];
 
         foreach ($labelMethods as $method => $type) {
-            if (preg_match('/public\s+function\s+'.$method.'\s*\([^)]*\)\s*:\s*[^{]*{[^}]*return\s+[\'"]([^\'"]+)[\'"]/', $content, $matches)) {
+            if (preg_match('/public\s+function\s+' . $method . '\s*\([^)]*\)\s*:\s*[^{]*{[^}]*return\s+[\'"]([^\'"]+)[\'"]/', $content, $matches)) {
                 $labels[] = [
                     'method' => $method,
                     'type' => $type,
@@ -359,7 +371,7 @@ class PageAnalyzer
         ];
 
         foreach ($navigationMethods as $method => $type) {
-            if (preg_match('/public\s+(?:static\s+)?function\s+'.$method.'\s*\([^)]*\)\s*:\s*[^{]*{[^}]*return\s+[\'"]([^\'"]+)[\'"]/', $content, $matches)) {
+            if (preg_match('/public\s+(?:static\s+)?function\s+' . $method . '\s*\([^)]*\)\s*:\s*[^{]*{[^}]*return\s+[\'"]([^\'"]+)[\'"]/', $content, $matches)) {
                 $navigation[] = [
                     'method' => $method,
                     'type' => $type,
@@ -377,13 +389,16 @@ class PageAnalyzer
     {
         $titles = [];
 
-        // Check for static title properties (only $title is static in Filament)
+        // Check for static title properties
         $titleProperties = [
             'title' => 'title',
+            'navigationLabel' => 'navigation_label',
+            'navigationIcon' => 'navigation_icon',
+            'navigationGroup' => 'navigation_group',
         ];
 
         foreach ($titleProperties as $property => $type) {
-            if (preg_match('/protected\s+static\s+\?string\s+\$'.$property.'\s*=\s*[\'"]([^\'"]+)[\'"]/', $content, $matches)) {
+            if (preg_match('/protected\s+static\s+\?string\s+\$' . $property . '\s*=\s*[\'"]([^\'"]+)[\'"]/', $content, $matches)) {
                 $titles[] = [
                     'property' => $property,
                     'type' => $type,
