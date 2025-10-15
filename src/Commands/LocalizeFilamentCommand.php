@@ -117,7 +117,7 @@ class LocalizeFilamentCommand extends Command
         $this->newLine();
         $this->line('╔════════════════════════════════════════════════════════════════╗');
         $this->line('║                                                                ║');
-        $this->line('║          Filament Localization Package '.str_pad($version, 20).' ║');
+        $this->line('║          Filament Localization Package ' . str_pad($version, 20) . ' ║');
         $this->line('║                                                                ║');
         $this->line('║  Automatically scan and localize Filament resources            ║');
         $this->line('║                                                                ║');
@@ -160,10 +160,10 @@ class LocalizeFilamentCommand extends Command
         // If specific panels are requested
         if ($this->option('panel')) {
             $requestedPanels = $this->option('panel');
-            $panels = $allPanels->filter(fn ($panel) => in_array($panel->getId(), $requestedPanels));
+            $panels = $allPanels->filter(fn($panel) => in_array($panel->getId(), $requestedPanels));
 
             if ($panels->isEmpty()) {
-                $this->error('❌ No matching panels found for: '.implode(', ', $requestedPanels));
+                $this->error('❌ No matching panels found for: ' . implode(', ', $requestedPanels));
 
                 return [];
             }
@@ -173,7 +173,7 @@ class LocalizeFilamentCommand extends Command
 
         // Filter out excluded panels
         $excludedPanels = config('filament-localization.excluded_panels', []);
-        $panels = $allPanels->filter(fn ($panel) => ! in_array($panel->getId(), $excludedPanels));
+        $panels = $allPanels->filter(fn($panel) => ! in_array($panel->getId(), $excludedPanels));
 
         return $panels->all();
     }
@@ -189,7 +189,7 @@ class LocalizeFilamentCommand extends Command
 
     protected function confirmProcessing(array $panels, array $locales): bool
     {
-        $panelNames = collect($panels)->map(fn ($panel) => $panel->getId())->implode(', ');
+        $panelNames = collect($panels)->map(fn($panel) => $panel->getId())->implode(', ');
 
         $this->table(
             ['Setting', 'Value'],
@@ -418,7 +418,7 @@ class LocalizeFilamentCommand extends Command
             preg_match_all('/use\s+([^;]+);/', $content, $useMatches);
 
             foreach ($useMatches[1] as $useStatement) {
-                if (str_ends_with($useStatement, '\\'.$pageClass) || $useStatement === $pageClass) {
+                if (str_ends_with($useStatement, '\\' . $pageClass) || $useStatement === $pageClass) {
                     return $useStatement;
                 }
 
@@ -434,7 +434,7 @@ class LocalizeFilamentCommand extends Command
             if (strpos($pageClass, '\\') === false) {
                 $resourceNamespace = (new \ReflectionClass($resourceClass))->getNamespaceName();
 
-                return $resourceNamespace.'\\Pages\\'.$pageClass;
+                return $resourceNamespace . '\\Pages\\' . $pageClass;
             }
         }
 
@@ -500,7 +500,7 @@ class LocalizeFilamentCommand extends Command
             preg_match_all('/use\s+([^;]+);/', $content, $useMatches);
 
             foreach ($useMatches[1] as $useStatement) {
-                if (str_ends_with($useStatement, '\\'.$relationManagerClass) || $useStatement === $relationManagerClass) {
+                if (str_ends_with($useStatement, '\\' . $relationManagerClass) || $useStatement === $relationManagerClass) {
                     return $useStatement;
                 }
 
@@ -516,7 +516,7 @@ class LocalizeFilamentCommand extends Command
             if (strpos($relationManagerClass, '\\') === false) {
                 $resourceNamespace = (new \ReflectionClass($resourceClass))->getNamespaceName();
 
-                return $resourceNamespace.'\\'.$relationManagerClass;
+                return $resourceNamespace . '\\' . $relationManagerClass;
             }
         }
 
@@ -568,6 +568,18 @@ class LocalizeFilamentCommand extends Command
                 // Custom HTML content
                 '/->html\(/',
                 '/->state\(/',
+
+                // Static properties with hardcoded strings
+                '/protected\s+static\s+\?string\s+\$title\s*=\s*[\'"][^\'"]+[\'"]/',
+                '/protected\s+static\s+\?string\s+\$navigationLabel\s*=\s*[\'"][^\'"]+[\'"]/',
+                '/protected\s+static\s+\?string\s+\$navigationIcon\s*=\s*[\'"][^\'"]+[\'"]/',
+                '/protected\s+static\s+\?string\s+\$navigationGroup\s*=\s*[\'"][^\'"]+[\'"]/',
+
+                // Method returns with hardcoded strings
+                '/public\s+(?:static\s+)?function\s+getTitle\s*\([^)]*\)\s*:\s*[^{]*{[^}]*return\s+[\'"][^\'"]+[\'"]/',
+                '/public\s+(?:static\s+)?function\s+getHeading\s*\([^)]*\)\s*:\s*[^{]*{[^}]*return\s+[\'"][^\'"]+[\'"]/',
+                '/public\s+(?:static\s+)?function\s+getSubheading\s*\([^)]*\)\s*:\s*[^{]*{[^}]*return\s+[\'"][^\'"]+[\'"]/',
+                '/public\s+(?:static\s+)?function\s+getNavigationLabel\s*\([^)]*\)\s*:\s*[^{]*{[^}]*return\s+[\'"][^\'"]+[\'"]/',
             ];
 
             foreach ($patterns as $pattern) {
@@ -596,13 +608,13 @@ class LocalizeFilamentCommand extends Command
                     $this->line($pintResult['output']);
                 }
             } else {
-                $this->warn('⚠️  Pint formatting failed: '.$pintResult['error']);
+                $this->warn('⚠️  Pint formatting failed: ' . $pintResult['error']);
                 if (! empty($pintResult['output'])) {
                     $this->line($pintResult['output']);
                 }
             }
         } catch (\Exception $e) {
-            $this->error('❌ Failed to run Pint: '.$e->getMessage());
+            $this->error('❌ Failed to run Pint: ' . $e->getMessage());
         }
     }
 
@@ -618,7 +630,7 @@ class LocalizeFilamentCommand extends Command
             $this->info('✅ Git commit created successfully!');
             $this->info('💡 You can revert this commit using: git reset --soft HEAD~1');
         } catch (\Exception $e) {
-            $this->error('❌ Failed to create git commit: '.$e->getMessage());
+            $this->error('❌ Failed to create git commit: ' . $e->getMessage());
         }
     }
 }

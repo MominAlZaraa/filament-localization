@@ -74,9 +74,9 @@ class TranslationFileGenerator
 
         return match ($structure) {
             'flat' => "{$basePath}/{$prefix}.php",
-            'nested' => "{$basePath}/{$prefix}/".Str::snake($analysis['resource_name']).'.php',
-            'panel-based' => "{$basePath}/{$prefix}/{$panelId}/".Str::snake($analysis['resource_name']).'.php',
-            default => "{$basePath}/{$prefix}/{$panelId}/".Str::snake($analysis['resource_name']).'.php',
+            'nested' => "{$basePath}/{$prefix}/" . Str::snake($analysis['resource_name']) . '.php',
+            'panel-based' => "{$basePath}/{$prefix}/{$panelId}/" . Str::snake($analysis['resource_name']) . '.php',
+            default => "{$basePath}/{$prefix}/{$panelId}/" . Str::snake($analysis['resource_name']) . '.php',
         };
     }
 
@@ -117,15 +117,15 @@ class TranslationFileGenerator
 
             // Add description translations if field has description
             if ($field['has_description']) {
-                $descriptionKey = $field['translation_key'].'_description';
-                $translations[$descriptionKey] = $field['default_label'].' Description';
+                $descriptionKey = $field['translation_key'] . '_description';
+                $translations[$descriptionKey] = $field['default_label'] . ' Description';
             }
 
             // Add Select options translations
             if (isset($field['select_options']) && ! empty($field['select_options'])) {
                 foreach ($field['select_options'] as $option) {
                     // Use the translation_key from the option (which now handles boolean fields correctly)
-                    $optionKey = $field['translation_key'].'.'.$option['translation_key'];
+                    $optionKey = $field['translation_key'] . '.' . $option['translation_key'];
                     // Use the option value for the translation text
                     $translations[$optionKey] = $option['value'];
                 }
@@ -133,8 +133,8 @@ class TranslationFileGenerator
 
             // Add default value translations
             if (isset($field['has_default']) && $field['has_default']) {
-                $defaultKey = $field['translation_key'].'_default';
-                $translations[$defaultKey] = $field['default_label'].' Default';
+                $defaultKey = $field['translation_key'] . '_default';
+                $translations[$defaultKey] = $field['default_label'] . ' Default';
             }
         }
 
@@ -163,8 +163,8 @@ class TranslationFileGenerator
 
             // Add description translations if section has description
             if (isset($section['has_description']) && $section['has_description']) {
-                $descriptionKey = $section['translation_key'].'_description';
-                $translations[$descriptionKey] = $section['title'].' Description';
+                $descriptionKey = $section['translation_key'] . '_description';
+                $translations[$descriptionKey] = $section['title'] . ' Description';
             }
         }
 
@@ -200,7 +200,7 @@ class TranslationFileGenerator
 
         foreach ($propertiesToHandle as $property) {
             // Pattern to match static property declarations
-            $pattern = '/protected static \?\w+ \$'.$property.'\s*=\s*[\'"][^\'"]*[\'"];?\s*\n?/';
+            $pattern = '/protected static \?\w+ \$' . $property . '\s*=\s*[\'"][^\'"]*[\'"];?\s*\n?/';
 
             if (preg_match($pattern, $content)) {
                 // Replace with null assignment
@@ -337,9 +337,9 @@ class TranslationFileGenerator
 
         return match ($structure) {
             'flat' => "{$basePath}/{$prefix}.php",
-            'nested' => "{$basePath}/{$prefix}/".Str::snake($analysis['page_name']).'.php',
-            'panel-based' => "{$basePath}/{$prefix}/{$panelId}/".Str::snake($analysis['page_name']).'.php',
-            default => "{$basePath}/{$prefix}/{$panelId}/".Str::snake($analysis['page_name']).'.php',
+            'nested' => "{$basePath}/{$prefix}/" . Str::snake($analysis['page_name']) . '.php',
+            'panel-based' => "{$basePath}/{$prefix}/{$panelId}/" . Str::snake($analysis['page_name']) . '.php',
+            default => "{$basePath}/{$prefix}/{$panelId}/" . Str::snake($analysis['page_name']) . '.php',
         };
     }
 
@@ -350,9 +350,9 @@ class TranslationFileGenerator
 
         return match ($structure) {
             'flat' => "{$basePath}/{$prefix}.php",
-            'nested' => "{$basePath}/{$prefix}/".Str::snake($analysis['relation_manager_name']).'.php',
-            'panel-based' => "{$basePath}/{$prefix}/{$panelId}/".Str::snake($analysis['relation_manager_name']).'.php',
-            default => "{$basePath}/{$prefix}/{$panelId}/".Str::snake($analysis['relation_manager_name']).'.php',
+            'nested' => "{$basePath}/{$prefix}/" . Str::snake($analysis['relation_manager_name']) . '.php',
+            'panel-based' => "{$basePath}/{$prefix}/{$panelId}/" . Str::snake($analysis['relation_manager_name']) . '.php',
+            default => "{$basePath}/{$prefix}/{$panelId}/" . Str::snake($analysis['relation_manager_name']) . '.php',
         };
     }
 
@@ -385,8 +385,8 @@ class TranslationFileGenerator
 
             // Add description translations if section has description
             if (isset($section['has_description']) && $section['has_description']) {
-                $descriptionKey = $section['translation_key'].'_description';
-                $translations[$descriptionKey] = $section['title'].' Description';
+                $descriptionKey = $section['translation_key'] . '_description';
+                $translations[$descriptionKey] = $section['title'] . ' Description';
             }
         }
 
@@ -462,8 +462,8 @@ class TranslationFileGenerator
 
             // Add description translations if section has description
             if (isset($section['has_description']) && $section['has_description']) {
-                $descriptionKey = $section['translation_key'].'_description';
-                $translations[$descriptionKey] = $section['title'].' Description';
+                $descriptionKey = $section['translation_key'] . '_description';
+                $translations[$descriptionKey] = $section['title'] . ' Description';
             }
         }
 

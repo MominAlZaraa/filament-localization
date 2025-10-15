@@ -89,7 +89,7 @@ class LocalizationService
                 return; // No custom content to localize
             }
 
-            if (empty($analysis['infolist_entries']) && empty($analysis['actions']) && empty($analysis['sections']) && empty($analysis['custom_content'])) {
+            if (empty($analysis['infolist_entries']) && empty($analysis['actions']) && empty($analysis['sections']) && empty($analysis['custom_content']) && empty($analysis['titles']) && empty($analysis['labels']) && empty($analysis['navigation'])) {
                 return; // Nothing to localize
             }
 

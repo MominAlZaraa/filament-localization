@@ -42,7 +42,7 @@ class TranslateWithDeepLCommand extends Command
                 return self::FAILURE;
             }
         } catch (\Exception $e) {
-            $this->error('❌ DeepL configuration error: '.$e->getMessage());
+            $this->error('❌ DeepL configuration error: ' . $e->getMessage());
 
             return self::FAILURE;
         }
@@ -59,14 +59,14 @@ class TranslateWithDeepLCommand extends Command
         // Validate languages
         if (! $this->deepLService->isLanguageSupported($sourceLang)) {
             $this->error("❌ Unsupported source language: {$sourceLang}");
-            $this->info('Supported languages: '.implode(', ', array_keys($this->deepLService->getSupportedLanguages())));
+            $this->info('Supported languages: ' . implode(', ', array_keys($this->deepLService->getSupportedLanguages())));
 
             return self::FAILURE;
         }
 
         if (! $this->deepLService->isLanguageSupported($targetLang)) {
             $this->error("❌ Unsupported target language: {$targetLang}");
-            $this->info('Supported languages: '.implode(', ', array_keys($this->deepLService->getSupportedLanguages())));
+            $this->info('Supported languages: ' . implode(', ', array_keys($this->deepLService->getSupportedLanguages())));
 
             return self::FAILURE;
         }
@@ -131,7 +131,8 @@ class TranslateWithDeepLCommand extends Command
         $this->warn('⚠️  IMPORTANT NOTICE:');
         $this->info('This command will translate your Filament resources using DeepL API.');
         $this->info('Make sure you have sufficient DeepL API credits.');
-        $this->info('Existing translations will be preserved and only missing ones will be translated.');
+        $this->info('By default, existing translations will be preserved and only missing ones will be translated.');
+        $this->info('Use --force to overwrite all existing translations with new ones from the source language.');
         $this->newLine();
     }
 
@@ -165,10 +166,10 @@ class TranslateWithDeepLCommand extends Command
         // If specific panels are requested
         if ($this->option('panel')) {
             $requestedPanels = $this->option('panel');
-            $panels = $allPanels->filter(fn ($panel) => in_array($panel->getId(), $requestedPanels));
+            $panels = $allPanels->filter(fn($panel) => in_array($panel->getId(), $requestedPanels));
 
             if ($panels->isEmpty()) {
-                $this->error('❌ No matching panels found for: '.implode(', ', $requestedPanels));
+                $this->error('❌ No matching panels found for: ' . implode(', ', $requestedPanels));
 
                 return [];
             }
@@ -181,7 +182,7 @@ class TranslateWithDeepLCommand extends Command
 
     protected function confirmTranslation(string $sourceLang, string $targetLang, array $panels): bool
     {
-        $panelNames = collect($panels)->map(fn ($panel) => $panel->getId())->implode(', ');
+        $panelNames = collect($panels)->map(fn($panel) => $panel->getId())->implode(', ');
 
         $this->table(
             ['Setting', 'Value'],
@@ -291,12 +292,7 @@ class TranslateWithDeepLCommand extends Command
             return;
         }
 
-        // Check if target file exists and we're not forcing
-        if (File::exists($targetPath) && ! $this->option('force')) {
-            $this->warn("  ⚠️  Target file already exists: {$targetPath}. Use --force to overwrite.");
-
-            return;
-        }
+        // Note: We no longer skip existing files - let the enhanced logic decide what to translate
 
         // Load source translations
         $sourceTranslations = include $sourcePath;
@@ -315,11 +311,31 @@ class TranslateWithDeepLCommand extends Command
             }
         }
 
-        // Filter out translations that already exist in target
-        $translationsToTranslate = [];
-        foreach ($sourceTranslations as $key => $value) {
-            if (! array_key_exists($key, $existingTargetTranslations)) {
-                $translationsToTranslate[$key] = $value;
+        // Determine what to translate based on force mode
+        if ($this->option('force')) {
+            // Force mode: translate ALL source translations, overwriting existing ones
+            $translationsToTranslate = $sourceTranslations;
+        } else {
+            // Normal mode: translate missing keys OR keys with identical content to source
+            $translationsToTranslate = [];
+            $skipTerms = config('filament-localization.skip_identical_terms', []);
+
+            foreach ($sourceTranslations as $key => $value) {
+                $needsTranslation = false;
+
+                if (! array_key_exists($key, $existingTargetTranslations)) {
+                    // Key doesn't exist - needs translation
+                    $needsTranslation = true;
+                } elseif ($existingTargetTranslations[$key] === $value) {
+                    // Key exists but has same content as source - check if it should be skipped
+                    if (! $this->shouldSkipTerm($value, $skipTerms)) {
+                        $needsTranslation = true;
+                    }
+                }
+
+                if ($needsTranslation) {
+                    $translationsToTranslate[$key] = $value;
+                }
             }
         }
 
@@ -330,13 +346,13 @@ class TranslateWithDeepLCommand extends Command
         }
 
         if ($this->option('dry-run')) {
-            $this->info('  🔍 Would translate '.count($translationsToTranslate)." keys for {$resourceName}");
+            $this->info('  🔍 Would translate ' . count($translationsToTranslate) . " keys for {$resourceName}");
 
             return;
         }
 
         // Translate using DeepL
-        $this->info('  🌐 Translating '.count($translationsToTranslate)." keys for {$resourceName}...");
+        $this->info('  🌐 Translating ' . count($translationsToTranslate) . " keys for {$resourceName}...");
 
         try {
             $translatedTexts = $this->deepLService->translateArray($translationsToTranslate, $sourceLang, $targetLang);
@@ -348,10 +364,16 @@ class TranslateWithDeepLCommand extends Command
             }
 
             // Merge with existing translations
-            $finalTranslations = array_merge($existingTargetTranslations, $translatedTexts);
+            if ($this->option('force')) {
+                // Force mode: use only the translated texts (overwrite everything)
+                $finalTranslations = $translatedTexts;
+            } else {
+                // Normal mode: merge with existing translations
+                $finalTranslations = array_merge($existingTargetTranslations, $translatedTexts);
+            }
             ksort($finalTranslations);
         } catch (\Exception $e) {
-            $this->error("  ❌ Translation failed for {$resourceName}: ".$e->getMessage());
+            $this->error("  ❌ Translation failed for {$resourceName}: " . $e->getMessage());
 
             return;
         }
@@ -379,9 +401,9 @@ class TranslateWithDeepLCommand extends Command
 
         return match ($structure) {
             'flat' => "{$basePath}/{$prefix}.php",
-            'nested' => "{$basePath}/{$prefix}/".\Illuminate\Support\Str::snake($resourceName).'.php',
-            'panel-based' => "{$basePath}/{$prefix}/{$panelId}/".\Illuminate\Support\Str::snake($resourceName).'.php',
-            default => "{$basePath}/{$prefix}/{$panelId}/".\Illuminate\Support\Str::snake($resourceName).'.php',
+            'nested' => "{$basePath}/{$prefix}/" . \Illuminate\Support\Str::snake($resourceName) . '.php',
+            'panel-based' => "{$basePath}/{$prefix}/{$panelId}/" . \Illuminate\Support\Str::snake($resourceName) . '.php',
+            default => "{$basePath}/{$prefix}/{$panelId}/" . \Illuminate\Support\Str::snake($resourceName) . '.php',
         };
     }
 
@@ -443,12 +465,7 @@ class TranslateWithDeepLCommand extends Command
             return;
         }
 
-        // Check if target file exists and we're not forcing
-        if (File::exists($targetPath) && ! $this->option('force')) {
-            $this->warn("  ⚠️  Target file already exists: {$targetPath}. Use --force to overwrite.");
-
-            return;
-        }
+        // Note: We no longer skip existing files - let the enhanced logic decide what to translate
 
         // Load source translations
         $sourceTranslations = include $sourcePath;
@@ -467,11 +484,31 @@ class TranslateWithDeepLCommand extends Command
             }
         }
 
-        // Filter out translations that already exist in target
-        $translationsToTranslate = [];
-        foreach ($sourceTranslations as $key => $value) {
-            if (! array_key_exists($key, $existingTargetTranslations)) {
-                $translationsToTranslate[$key] = $value;
+        // Determine what to translate based on force mode
+        if ($this->option('force')) {
+            // Force mode: translate ALL source translations, overwriting existing ones
+            $translationsToTranslate = $sourceTranslations;
+        } else {
+            // Normal mode: translate missing keys OR keys with identical content to source
+            $translationsToTranslate = [];
+            $skipTerms = config('filament-localization.skip_identical_terms', []);
+
+            foreach ($sourceTranslations as $key => $value) {
+                $needsTranslation = false;
+
+                if (! array_key_exists($key, $existingTargetTranslations)) {
+                    // Key doesn't exist - needs translation
+                    $needsTranslation = true;
+                } elseif ($existingTargetTranslations[$key] === $value) {
+                    // Key exists but has same content as source - check if it should be skipped
+                    if (! $this->shouldSkipTerm($value, $skipTerms)) {
+                        $needsTranslation = true;
+                    }
+                }
+
+                if ($needsTranslation) {
+                    $translationsToTranslate[$key] = $value;
+                }
             }
         }
 
@@ -491,7 +528,13 @@ class TranslateWithDeepLCommand extends Command
         }
 
         // Merge with existing translations
-        $finalTranslations = array_merge($existingTargetTranslations, $translatedKeys);
+        if ($this->option('force')) {
+            // Force mode: use only the translated texts (overwrite everything)
+            $finalTranslations = $translatedKeys;
+        } else {
+            // Normal mode: merge with existing translations
+            $finalTranslations = array_merge($existingTargetTranslations, $translatedKeys);
+        }
 
         // Ensure target directory exists
         $targetDir = dirname($targetPath);
@@ -525,12 +568,7 @@ class TranslateWithDeepLCommand extends Command
             return;
         }
 
-        // Check if target file exists and we're not forcing
-        if (File::exists($targetPath) && ! $this->option('force')) {
-            $this->warn("  ⚠️  Target file already exists: {$targetPath}. Use --force to overwrite.");
-
-            return;
-        }
+        // Note: We no longer skip existing files - let the enhanced logic decide what to translate
 
         // Load source translations
         $sourceTranslations = include $sourcePath;
@@ -549,11 +587,31 @@ class TranslateWithDeepLCommand extends Command
             }
         }
 
-        // Filter out translations that already exist in target
-        $translationsToTranslate = [];
-        foreach ($sourceTranslations as $key => $value) {
-            if (! array_key_exists($key, $existingTargetTranslations)) {
-                $translationsToTranslate[$key] = $value;
+        // Determine what to translate based on force mode
+        if ($this->option('force')) {
+            // Force mode: translate ALL source translations, overwriting existing ones
+            $translationsToTranslate = $sourceTranslations;
+        } else {
+            // Normal mode: translate missing keys OR keys with identical content to source
+            $translationsToTranslate = [];
+            $skipTerms = config('filament-localization.skip_identical_terms', []);
+
+            foreach ($sourceTranslations as $key => $value) {
+                $needsTranslation = false;
+
+                if (! array_key_exists($key, $existingTargetTranslations)) {
+                    // Key doesn't exist - needs translation
+                    $needsTranslation = true;
+                } elseif ($existingTargetTranslations[$key] === $value) {
+                    // Key exists but has same content as source - check if it should be skipped
+                    if (! $this->shouldSkipTerm($value, $skipTerms)) {
+                        $needsTranslation = true;
+                    }
+                }
+
+                if ($needsTranslation) {
+                    $translationsToTranslate[$key] = $value;
+                }
             }
         }
 
@@ -573,7 +631,13 @@ class TranslateWithDeepLCommand extends Command
         }
 
         // Merge with existing translations
-        $finalTranslations = array_merge($existingTargetTranslations, $translatedKeys);
+        if ($this->option('force')) {
+            // Force mode: use only the translated texts (overwrite everything)
+            $finalTranslations = $translatedKeys;
+        } else {
+            // Normal mode: merge with existing translations
+            $finalTranslations = array_merge($existingTargetTranslations, $translatedKeys);
+        }
 
         // Ensure target directory exists
         $targetDir = dirname($targetPath);
@@ -624,7 +688,7 @@ class TranslateWithDeepLCommand extends Command
 
                 // Look for page classes in the same directory
                 $resourceDir = dirname($filePath);
-                $pagesDir = $resourceDir.'/Pages';
+                $pagesDir = $resourceDir . '/Pages';
 
                 if (File::exists($pagesDir)) {
                     $pageFiles = File::allFiles($pagesDir);
@@ -642,7 +706,7 @@ class TranslateWithDeepLCommand extends Command
                         ) {
 
                             $namespace = $this->extractNamespace($pageContent);
-                            $fullClassName = $namespace.'\\'.$pageClassName;
+                            $fullClassName = $namespace . '\\' . $pageClassName;
 
                             if (class_exists($fullClassName)) {
                                 $pages[] = $fullClassName;
@@ -691,7 +755,7 @@ class TranslateWithDeepLCommand extends Command
 
                 // Look for relation manager classes in the same directory
                 $resourceDir = dirname($filePath);
-                $relationManagersDir = $resourceDir.'/RelationManagers';
+                $relationManagersDir = $resourceDir . '/RelationManagers';
 
                 if (File::exists($relationManagersDir)) {
                     $relationManagerFiles = File::allFiles($relationManagersDir);
@@ -707,7 +771,7 @@ class TranslateWithDeepLCommand extends Command
                         ) {
 
                             $namespace = $this->extractNamespace($relationManagerContent);
-                            $fullClassName = $namespace.'\\'.$relationManagerClassName;
+                            $fullClassName = $namespace . '\\' . $relationManagerClassName;
 
                             if (class_exists($fullClassName)) {
                                 $relationManagers[] = $fullClassName;
@@ -741,5 +805,28 @@ class TranslateWithDeepLCommand extends Command
         }
 
         return '';
+    }
+
+    protected function shouldSkipTerm(string $value, array $skipTerms): bool
+    {
+        // Check if the value exactly matches any skip term
+        if (in_array($value, $skipTerms)) {
+            return true;
+        }
+
+        // Check if the value contains only skip terms (for compound terms)
+        $words = preg_split('/\s+/', $value);
+        $allWordsAreSkipTerms = true;
+
+        foreach ($words as $word) {
+            // Remove punctuation for comparison
+            $cleanWord = preg_replace('/[^\w]/', '', $word);
+            if (! empty($cleanWord) && ! in_array($cleanWord, $skipTerms)) {
+                $allWordsAreSkipTerms = false;
+                break;
+            }
+        }
+
+        return $allWordsAreSkipTerms;
     }
 }
