@@ -32,10 +32,10 @@ class WidgetAnalyzer
     protected function analyzeStats(string $content): array
     {
         $stats = [];
-        
+
         // Pattern to match Stat::make() calls with hardcoded strings
         $pattern = '/Stat::make\s*\(\s*[\'"]([^\'"]+)[\'"]\s*,\s*[^)]+\)/';
-        
+
         if (preg_match_all($pattern, $content, $matches, PREG_SET_ORDER)) {
             foreach ($matches as $match) {
                 $stats[] = [
@@ -49,7 +49,7 @@ class WidgetAnalyzer
 
         // Pattern to match ->description() calls with hardcoded strings
         $descriptionPattern = '/->description\s*\(\s*[\'"]([^\'"]+)[\'"]\s*\)/';
-        
+
         if (preg_match_all($descriptionPattern, $content, $matches, PREG_SET_ORDER)) {
             foreach ($matches as $match) {
                 $stats[] = [
@@ -63,7 +63,7 @@ class WidgetAnalyzer
 
         // Pattern to match other hardcoded strings in widget methods
         $methodPattern = '/->(?:title|label|placeholder|helper|hint)\s*\(\s*[\'"]([^\'"]+)[\'"]\s*\)/';
-        
+
         if (preg_match_all($methodPattern, $content, $matches, PREG_SET_ORDER)) {
             foreach ($matches as $match) {
                 $stats[] = [
@@ -83,13 +83,13 @@ class WidgetAnalyzer
         $patterns = [
             // Stat::make with hardcoded strings
             '/Stat::make\s*\(\s*[\'"][^\'"]+[\'"]\s*,\s*[^)]+\)/',
-            
+
             // Description with hardcoded strings
             '/->description\s*\(\s*[\'"][^\'"]+[\'"]\s*\)/',
-            
+
             // Other widget properties with hardcoded strings
             '/->(?:title|label|placeholder|helper|hint)\s*\(\s*[\'"][^\'"]+[\'"]\s*\)/',
-            
+
             // String literals in widget methods
             '/[\'"][A-Z][a-zA-Z\s]+[\'"]/',
         ];

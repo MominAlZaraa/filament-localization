@@ -42,7 +42,7 @@ class TranslateWithDeepLCommand extends Command
                 return self::FAILURE;
             }
         } catch (\Exception $e) {
-            $this->error('❌ DeepL configuration error: ' . $e->getMessage());
+            $this->error('❌ DeepL configuration error: '.$e->getMessage());
 
             return self::FAILURE;
         }
@@ -59,14 +59,14 @@ class TranslateWithDeepLCommand extends Command
         // Validate languages
         if (! $this->deepLService->isLanguageSupported($sourceLang)) {
             $this->error("❌ Unsupported source language: {$sourceLang}");
-            $this->info('Supported languages: ' . implode(', ', array_keys($this->deepLService->getSupportedLanguages())));
+            $this->info('Supported languages: '.implode(', ', array_keys($this->deepLService->getSupportedLanguages())));
 
             return self::FAILURE;
         }
 
         if (! $this->deepLService->isLanguageSupported($targetLang)) {
             $this->error("❌ Unsupported target language: {$targetLang}");
-            $this->info('Supported languages: ' . implode(', ', array_keys($this->deepLService->getSupportedLanguages())));
+            $this->info('Supported languages: '.implode(', ', array_keys($this->deepLService->getSupportedLanguages())));
 
             return self::FAILURE;
         }
@@ -166,10 +166,10 @@ class TranslateWithDeepLCommand extends Command
         // If specific panels are requested
         if ($this->option('panel')) {
             $requestedPanels = $this->option('panel');
-            $panels = $allPanels->filter(fn($panel) => in_array($panel->getId(), $requestedPanels));
+            $panels = $allPanels->filter(fn ($panel) => in_array($panel->getId(), $requestedPanels));
 
             if ($panels->isEmpty()) {
-                $this->error('❌ No matching panels found for: ' . implode(', ', $requestedPanels));
+                $this->error('❌ No matching panels found for: '.implode(', ', $requestedPanels));
 
                 return [];
             }
@@ -182,7 +182,7 @@ class TranslateWithDeepLCommand extends Command
 
     protected function confirmTranslation(string $sourceLang, string $targetLang, array $panels): bool
     {
-        $panelNames = collect($panels)->map(fn($panel) => $panel->getId())->implode(', ');
+        $panelNames = collect($panels)->map(fn ($panel) => $panel->getId())->implode(', ');
 
         $this->table(
             ['Setting', 'Value'],
@@ -356,13 +356,13 @@ class TranslateWithDeepLCommand extends Command
         }
 
         if ($this->option('dry-run')) {
-            $this->info('  🔍 Would translate ' . count($translationsToTranslate) . " keys for {$resourceName}");
+            $this->info('  🔍 Would translate '.count($translationsToTranslate)." keys for {$resourceName}");
 
             return;
         }
 
         // Translate using DeepL
-        $this->info('  🌐 Translating ' . count($translationsToTranslate) . " keys for {$resourceName}...");
+        $this->info('  🌐 Translating '.count($translationsToTranslate)." keys for {$resourceName}...");
 
         try {
             $translatedTexts = $this->deepLService->translateArray($translationsToTranslate, $sourceLang, $targetLang);
@@ -383,7 +383,7 @@ class TranslateWithDeepLCommand extends Command
             }
             ksort($finalTranslations);
         } catch (\Exception $e) {
-            $this->error("  ❌ Translation failed for {$resourceName}: " . $e->getMessage());
+            $this->error("  ❌ Translation failed for {$resourceName}: ".$e->getMessage());
 
             return;
         }
@@ -411,9 +411,9 @@ class TranslateWithDeepLCommand extends Command
 
         return match ($structure) {
             'flat' => "{$basePath}/{$prefix}.php",
-            'nested' => "{$basePath}/{$prefix}/" . \Illuminate\Support\Str::snake($resourceName) . '.php',
-            'panel-based' => "{$basePath}/{$prefix}/{$panelId}/" . \Illuminate\Support\Str::snake($resourceName) . '.php',
-            default => "{$basePath}/{$prefix}/{$panelId}/" . \Illuminate\Support\Str::snake($resourceName) . '.php',
+            'nested' => "{$basePath}/{$prefix}/".\Illuminate\Support\Str::snake($resourceName).'.php',
+            'panel-based' => "{$basePath}/{$prefix}/{$panelId}/".\Illuminate\Support\Str::snake($resourceName).'.php',
+            default => "{$basePath}/{$prefix}/{$panelId}/".\Illuminate\Support\Str::snake($resourceName).'.php',
         };
     }
 
@@ -785,7 +785,7 @@ class TranslateWithDeepLCommand extends Command
 
                 // Look for page classes in the same directory
                 $resourceDir = dirname($filePath);
-                $pagesDir = $resourceDir . '/Pages';
+                $pagesDir = $resourceDir.'/Pages';
 
                 if (File::exists($pagesDir)) {
                     $pageFiles = File::allFiles($pagesDir);
@@ -803,7 +803,7 @@ class TranslateWithDeepLCommand extends Command
                         ) {
 
                             $namespace = $this->extractNamespace($pageContent);
-                            $fullClassName = $namespace . '\\' . $pageClassName;
+                            $fullClassName = $namespace.'\\'.$pageClassName;
 
                             if (class_exists($fullClassName)) {
                                 $pages[] = $fullClassName;
@@ -852,7 +852,7 @@ class TranslateWithDeepLCommand extends Command
 
                 // Look for relation manager classes in the same directory
                 $resourceDir = dirname($filePath);
-                $relationManagersDir = $resourceDir . '/RelationManagers';
+                $relationManagersDir = $resourceDir.'/RelationManagers';
 
                 if (File::exists($relationManagersDir)) {
                     $relationManagerFiles = File::allFiles($relationManagersDir);
@@ -868,7 +868,7 @@ class TranslateWithDeepLCommand extends Command
                         ) {
 
                             $namespace = $this->extractNamespace($relationManagerContent);
-                            $fullClassName = $namespace . '\\' . $relationManagerClassName;
+                            $fullClassName = $namespace.'\\'.$relationManagerClassName;
 
                             if (class_exists($fullClassName)) {
                                 $relationManagers[] = $fullClassName;
@@ -910,9 +910,9 @@ class TranslateWithDeepLCommand extends Command
 
         return match ($structure) {
             'flat' => "{$basePath}/{$prefix}.php",
-            'nested' => "{$basePath}/{$prefix}/" . \Illuminate\Support\Str::snake($widgetName) . '.php',
-            'panel-based' => "{$basePath}/{$prefix}/{$panelId}/" . \Illuminate\Support\Str::snake($widgetName) . '.php',
-            default => "{$basePath}/{$prefix}/{$panelId}/" . \Illuminate\Support\Str::snake($widgetName) . '.php',
+            'nested' => "{$basePath}/{$prefix}/".\Illuminate\Support\Str::snake($widgetName).'.php',
+            'panel-based' => "{$basePath}/{$prefix}/{$panelId}/".\Illuminate\Support\Str::snake($widgetName).'.php',
+            default => "{$basePath}/{$prefix}/{$panelId}/".\Illuminate\Support\Str::snake($widgetName).'.php',
         };
     }
 
@@ -1024,7 +1024,7 @@ class TranslateWithDeepLCommand extends Command
             preg_match_all('/use\s+([^;]+);/', $content, $useMatches);
 
             foreach ($useMatches[1] as $useStatement) {
-                if (str_ends_with($useStatement, '\\' . $widgetClass) || $useStatement === $widgetClass) {
+                if (str_ends_with($useStatement, '\\'.$widgetClass) || $useStatement === $widgetClass) {
                     return $useStatement;
                 }
 
@@ -1039,7 +1039,7 @@ class TranslateWithDeepLCommand extends Command
             // If not found in use statements, try to construct the namespace from the parent class
             $parentNamespace = (new \ReflectionClass($parentClass))->getNamespaceName();
             $widgetNamespace = str_replace(['Resources', 'Pages'], 'Widgets', $parentNamespace);
-            $fullWidgetClass = $widgetNamespace . '\\' . $widgetClass;
+            $fullWidgetClass = $widgetNamespace.'\\'.$widgetClass;
 
             if (class_exists($fullWidgetClass)) {
                 return $fullWidgetClass;
