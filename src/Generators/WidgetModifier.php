@@ -25,18 +25,18 @@ class WidgetModifier
 
             if ($stat['type'] === 'stat_title') {
                 // Replace Stat::make('Title', $value) with Stat::make(__('key'), $value)
-                $pattern = '/Stat::make\s*\(\s*[\'"]' . $escapedValue . '[\'"]\s*,\s*([^)]+)\)/';
-                $replacement = 'Stat::make(__(\'' . $translationKey . '\'), $1)';
+                $pattern = '/Stat::make\s*\(\s*[\'"]'.$escapedValue.'[\'"]\s*,\s*([^)]+)\)/';
+                $replacement = 'Stat::make(__(\''.$translationKey.'\'), $1)';
                 $content = preg_replace($pattern, $replacement, $content, 1);
             } elseif ($stat['type'] === 'stat_description') {
                 // Replace ->description('Description') with ->description(__('key'))
-                $pattern = '/->description\s*\(\s*[\'"]' . $escapedValue . '[\'"]\s*\)/';
-                $replacement = '->description(__(\'' . $translationKey . '\'))';
+                $pattern = '/->description\s*\(\s*[\'"]'.$escapedValue.'[\'"]\s*\)/';
+                $replacement = '->description(__(\''.$translationKey.'\'))';
                 $content = preg_replace($pattern, $replacement, $content, 1);
             } elseif ($stat['type'] === 'widget_property') {
                 // Replace ->property('Value') with ->property(__('key'))
-                $pattern = '/->(title|label|placeholder|helper|hint)\s*\(\s*[\'"]' . $escapedValue . '[\'"]\s*\)/';
-                $replacement = '->$1(__(\'' . $translationKey . '\'))';
+                $pattern = '/->(title|label|placeholder|helper|hint)\s*\(\s*[\'"]'.$escapedValue.'[\'"]\s*\)/';
+                $replacement = '->$1(__(\''.$translationKey.'\'))';
                 $content = preg_replace($pattern, $replacement, $content, 1);
             }
         }
