@@ -184,10 +184,10 @@ class LocalizationService
                 $reflection = new \ReflectionClass($widgetClass);
                 $filePath = $reflection->getFileName();
 
-                if ($filePath && \File::exists($filePath)) {
-                    $content = \File::get($filePath);
+                if ($filePath && File::exists($filePath)) {
+                    $content = File::get($filePath);
                     $modifiedContent = $this->widgetModifier->modify($content, $analysis, $panel);
-                    \File::put($filePath, $modifiedContent);
+                    File::put($filePath, $modifiedContent);
                 }
             }
 
