@@ -75,7 +75,7 @@ class PageModifier
                 $escapedEntryName = preg_quote($entryName, '/');
 
                 // Pattern: Find make('entry') followed by ->label() anywhere after it
-                $pattern = "/({$component}::make\(['\"]".$escapedEntryName."['\"]\)(?:.*?))->label\((?:[^()]*|\([^()]*\))*\)/s";
+                $pattern = "/({$component}::make\(['\"]" . $escapedEntryName . "['\"]\)(?:.*?))->label\((?:[^()]*|\([^()]*\))*\)/s";
                 $replacement = "$1->label(__('$translationKey'))";
 
                 $newContent = preg_replace($pattern, $replacement, $content, 1);
@@ -88,7 +88,7 @@ class PageModifier
             } else {
                 // Add label after make()
                 $escapedEntryName = preg_quote($entryName, '/');
-                $pattern = "/({$component}::make\(['\"]".$escapedEntryName."['\"]\))/";
+                $pattern = "/({$component}::make\(['\"]" . $escapedEntryName . "['\"]\))/";
                 $replacement = "$1\n                    ->label(__('$translationKey'))";
 
                 $newContent = preg_replace($pattern, $replacement, $content, 1);
@@ -121,7 +121,7 @@ class PageModifier
                 $escapedActionName = preg_quote($actionName, '/');
 
                 // Pattern: Find make('action') followed by ->label() anywhere after it
-                $pattern = "/({$component}::make\(['\"]".$escapedActionName."['\"]\)(?:.*?))->label\((?:[^()]*|\([^()]*\))*\)/s";
+                $pattern = "/({$component}::make\(['\"]" . $escapedActionName . "['\"]\)(?:.*?))->label\((?:[^()]*|\([^()]*\))*\)/s";
                 $replacement = "$1->label(__('$translationKey'))";
 
                 $newContent = preg_replace($pattern, $replacement, $content, 1);
@@ -133,7 +133,7 @@ class PageModifier
             } else {
                 // Add label after make()
                 $escapedActionName = preg_quote($actionName, '/');
-                $pattern = "/({$component}::make\(['\"]".$escapedActionName."['\"]\))/";
+                $pattern = "/({$component}::make\(['\"]" . $escapedActionName . "['\"]\))/";
                 $replacement = "$1\n                    ->label(__('$translationKey'))";
 
                 $newContent = preg_replace($pattern, $replacement, $content, 1);
@@ -156,7 +156,7 @@ class PageModifier
             $translationKey = $this->buildTranslationKey($analysis, $panel, $section['translation_key']);
 
             // Replace hardcoded section titles with translation keys
-            $pattern = "/{$component}::make\(['\"]".preg_quote($title, '/')."['\"]\)/";
+            $pattern = "/{$component}::make\(['\"]" . preg_quote($title, '/') . "['\"]\)/";
             $replacement = "{$component}::make(__('$translationKey'))";
 
             $content = preg_replace($pattern, $replacement, $content, 1);
@@ -188,9 +188,9 @@ class PageModifier
 
         return match ($structure) {
             'flat' => "{$prefix}.{$key}",
-            'nested' => "{$prefix}/".Str::snake($analysis['page_name']).".{$key}",
-            'panel-based' => "{$prefix}/{$panel->getId()}/".Str::snake($analysis['page_name']).".{$key}",
-            default => "{$prefix}/{$panel->getId()}/".Str::snake($analysis['page_name']).".{$key}",
+            'nested' => "{$prefix}/" . Str::snake($analysis['page_name']) . ".{$key}",
+            'panel-based' => "{$prefix}/{$panel->getId()}/" . Str::snake($analysis['page_name']) . ".{$key}",
+            default => "{$prefix}/{$panel->getId()}/" . Str::snake($analysis['page_name']) . ".{$key}",
         };
     }
 
@@ -205,7 +205,7 @@ class PageModifier
             $escapedValue = preg_quote($label['value'], '/');
 
             // Replace hardcoded values with translation keys
-            $pattern = '/return\s+[\'"]'.$escapedValue.'[\'"]/';
+            $pattern = '/return\s+[\'"]' . $escapedValue . '[\'"]/';
             $replacement = "return __('$translationKey')";
 
             $content = preg_replace($pattern, $replacement, $content, 1);
@@ -225,7 +225,7 @@ class PageModifier
             $escapedValue = preg_quote($nav['value'], '/');
 
             // Replace hardcoded values with translation keys
-            $pattern = '/return\s+[\'"]'.$escapedValue.'[\'"]/';
+            $pattern = '/return\s+[\'"]' . $escapedValue . '[\'"]/';
             $replacement = "return __('$translationKey')";
 
             $content = preg_replace($pattern, $replacement, $content, 1);
@@ -244,11 +244,17 @@ class PageModifier
             $translationKey = $this->buildTranslationKey($analysis, $panel, $title['translation_key']);
             $escapedValue = preg_quote($title['value'], '/');
 
-            // Replace hardcoded values with null (we'll use getTitle() method instead)
-            $pattern = '/protected\s+static\s+\?string\s+\$'.$title['property'].'\s*=\s*[\'"]'.$escapedValue.'[\'"]/';
-            $replacement = 'protected static ?string $'.$title['property'].' = null';
+            // For static properties, we need to replace them with null and add getter methods
+            if ($title['is_static']) {
+                // Replace hardcoded values with null
+                $pattern = '/protected\s+static\s+\?string\s+\$' . $title['property'] . '\s*=\s*[\'"]' . $escapedValue . '[\'"]/';
+                $replacement = 'protected static ?string $' . $title['property'] . ' = null';
 
-            $content = preg_replace($pattern, $replacement, $content, 1);
+                $content = preg_replace($pattern, $replacement, $content, 1);
+
+                // Add getter method if it doesn't exist
+                $content = $this->addGetterMethod($content, $title, $translationKey);
+            }
         }
 
         return $content;
@@ -276,9 +282,33 @@ class PageModifier
         return $content;
     }
 
+    protected function addGetterMethod(string $content, array $title, string $translationKey): string
+    {
+        $methodName = 'get' . ucfirst($title['property']);
+
+        // Check if method already exists
+        if (preg_match('/public\s+(?:static\s+)?function\s+' . $methodName . '\s*\(/', $content)) {
+            return $content;
+        }
+
+        // Determine if the method should be static based on the property type
+        $isStatic = in_array($title['property'], ['navigationLabel', 'navigationIcon', 'navigationGroup', 'navigationSort']);
+        $staticKeyword = $isStatic ? 'static ' : '';
+
+        // Add getter method before the closing brace
+        $pattern = '/(\n\s*}\s*)$/';
+        if (preg_match($pattern, $content, $matches, PREG_OFFSET_CAPTURE)) {
+            $insertPosition = $matches[0][1];
+            $method = "\n    public {$staticKeyword}function {$methodName}(): string\n    {\n        return __('{$translationKey}');\n    }\n";
+            $content = substr_replace($content, $method, $insertPosition, 0);
+        }
+
+        return $content;
+    }
+
     protected function createBackup(string $filePath): void
     {
-        $backupPath = $filePath.'.backup.'.date('Y-m-d-H-i-s');
+        $backupPath = $filePath . '.backup.' . date('Y-m-d-H-i-s');
         File::copy($filePath, $backupPath);
     }
 }

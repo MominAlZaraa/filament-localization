@@ -13,16 +13,20 @@ Automatically scan and localize Filament resources with structured translation f
 
 **Requirements**: PHP ^8.2|^8.3|^8.4 | Laravel ^12.0 | Filament ^4.0
 
+> **🆕 Latest Updates**: Enhanced DeepL integration with smart translation detection, page localization support, and intelligent skip terms configuration.
+
 ## Features
 
-- 🚀 **Automatic Scanning**: Scans all Filament resources across panels
+- 🚀 **Automatic Scanning**: Scans all Filament resources, pages, and relation managers
 - 🏗️ **Smart Localization**: Removes hardcoded labels and creates translation keys
-- 🤖 **DeepL Integration**: Automatic translation using DeepL API (40+ languages)
+- 🤖 **DeepL Integration**: Intelligent translation with smart detection of untranslated content
 - 📊 **Structured Organization**: Creates organized translation files
 - 🔄 **Git Integration**: Automatic commits for easy reverting
-- ⚡ **Zero Configuration**: Works out of the box with automatic dependency management
+- ⚡ **Zero Configuration**: Works out of the box
 - 🎯 **Selective Processing**: Process specific panels or all at once
 - 🔒 **Safe Operation**: Backups and dry-run mode
+- 🧠 **Smart Detection**: Automatically detects untranslated content
+- 🚫 **Skip Terms**: Intelligently skips acronyms and technical terms
 
 ## Supported Components
 
@@ -44,8 +48,13 @@ Automatically scan and localize Filament resources with structured translation f
 ### Layout Components
 - Section, Fieldset, Grid, Tabs, Wizard, Step, Group
 
+### Filament Pages
+- Dashboard pages with static properties
+- Custom pages with hardcoded strings
+- Page methods (getTitle, getHeading, getNavigationLabel)
+
 ### Other Components
-- Actions, Filters, Notifications
+- Actions, Filters, Notifications, Relation Managers
 
 ## Installation
 
@@ -63,12 +72,12 @@ php artisan vendor:publish --tag="filament-localization-config"
 
 ## Configuration
 
-The configuration file `config/filament-localization.php` provides extensive customization options:
+The configuration file `config/filament-localization.php` provides customization options:
 
 ```php
 return [
     'default_locale' => 'en',
-    'locales' => ['en', 'el'],
+    'locales' => ['en', 'es', 'fr'],
     'structure' => 'panel-based', // flat, nested, or panel-based
     'backup' => true,
     'git' => [
@@ -77,9 +86,18 @@ return [
     ],
     'excluded_panels' => [],
     'excluded_resources' => [],
-    'label_generation' => 'title_case', // title_case, sentence_case, or keep_original
-    'preserve_existing_labels' => false,
     'translation_key_prefix' => 'filament',
+    
+    // Skip Terms - Terms that should remain the same across languages
+    'skip_identical_terms' => [
+        'API', 'URL', 'HTTP', 'HTTPS', 'PDF', 'CSV', 'JSON', 'XML',
+        'Laravel', 'Filament', 'Vue', 'React', 'Angular', 'Google', 'Microsoft',
+        'GitHub', 'Docker', 'AWS', 'Azure', 'PayPal', 'Stripe', 'WordPress',
+        'Bootstrap', 'Tailwind', 'jQuery', 'TypeScript', 'Webpack', 'Vite',
+        'JWT', 'OAuth', 'REST', 'GraphQL', 'SEO', 'UX', 'UI', 'SaaS', 'PaaS',
+        'IoT', 'AI', 'ML', 'DevOps', 'CI/CD', 'Agile', 'Scrum', 'TDD', 'BDD',
+        'GDPR', 'ISO', 'IEEE', 'W3C', 'OWASP', 'NIST', 'ITIL', 'PMP',
+    ],
     
     // DeepL Translation Configuration
     'deepl' => [
@@ -94,7 +112,7 @@ return [
 
 ## Commands
 
-The package provides two powerful commands for localization and translation:
+The package provides two commands for localization and translation:
 
 ### 1. `filament:localize` - Main Localization Command
 
@@ -105,7 +123,7 @@ Scans and localizes Filament resources with structured translation files.
 php artisan filament:localize
 
 # Specific panels and locales
-php artisan filament:localize --panel=admin --locale=en --locale=el
+php artisan filament:localize --panel=admin --locale=en --locale=es
 
 # Preview changes
 php artisan filament:localize --dry-run
@@ -126,31 +144,37 @@ php artisan filament:localize --no-git
 
 ### 2. `filament:translate-with-deepl` - DeepL Translation Command
 
-Translates Filament resources using the DeepL API.
+Intelligently translates Filament resources using the DeepL API with smart detection of untranslated content.
 
 **Prerequisites:**
 1. Get a DeepL API key from [DeepL API](https://www.deepl.com/pro-api)
 2. Add to your `.env` file: `DEEPL_API_KEY=your_deepl_api_key_here`
 
 ```bash
-# Translate from English to Greek
-php artisan filament:translate-with-deepl --source-lang=en --target-lang=el --panel=admin
+# Smart translation - detects untranslated content automatically
+php artisan filament:translate-with-deepl --source-lang=en --target-lang=es --panel=admin
 
-# Multiple panels with force
-php artisan filament:translate-with-deepl --source-lang=en --target-lang=es --panel=admin --panel=blogger --force
+# Force mode - overwrites all existing translations
+php artisan filament:translate-with-deepl --source-lang=en --target-lang=fr --panel=admin --force
 
-# Preview translations
-php artisan filament:translate-with-deepl --source-lang=en --target-lang=de --panel=admin --dry-run
+# Multiple panels with preview
+php artisan filament:translate-with-deepl --source-lang=en --target-lang=de --panel=admin --panel=blog --dry-run
 ```
+
+**Features:**
+- **Smart Detection**: Automatically detects untranslated content
+- **Skip Terms**: Intelligently skips acronyms and technical terms
+- **Force Mode**: Overwrites existing translations when using `--force`
+- **Mixed Content**: Processes files with both translated and untranslated content
 
 **Options:**
 - `--source-lang=SOURCE-LANG` - Source language code (default: "en")
 - `--target-lang=TARGET-LANG` - Target language code (required)
 - `--panel=PANEL` - Specific panel(s) to translate
-- `--force` - Force translation even if target files exist
+- `--force` - Force translation and overwrite all existing translations
 - `--dry-run` - Preview changes without applying them
 
-**Supported Languages:** 40+ languages including English, Spanish, French, German, Italian, Portuguese, Russian, Japanese, Chinese, Greek, Arabic, and more.
+**Supported Languages:** 40+ languages including English, Spanish, French, German, Italian, Portuguese, Russian, Japanese, Chinese, Arabic, and more.
 
 ## Quick Start
 
@@ -161,7 +185,7 @@ php artisan filament:translate-with-deepl --source-lang=en --target-lang=de --pa
 
 2. **Translate with DeepL (optional):**
    ```bash
-   php artisan filament:translate-with-deepl --source-lang=en --target-lang=el --panel=admin
+   php artisan filament:translate-with-deepl --source-lang=en --target-lang=es --panel=admin
    ```
 
 3. **Install language switcher:**
@@ -174,7 +198,7 @@ php artisan filament:translate-with-deepl --source-lang=en --target-lang=de --pa
    FilamentLanguageSwitcherPlugin::make()
        ->locales([
            ['code' => 'en', 'name' => 'English', 'flag' => 'gb'],
-           ['code' => 'el', 'name' => 'Greek', 'flag' => 'gr'],
+           ['code' => 'es', 'name' => 'Spanish', 'flag' => 'es'],
        ])
    ```
 
@@ -186,20 +210,23 @@ The package creates organized translation files based on your configuration:
 ```
 lang/
 ├── en/filament/admin/user_resource.php
-├── en/filament/blogger/post_resource.php
-└── el/filament/admin/user_resource.php
+├── en/filament/blog/post_resource.php
+└── es/filament/admin/user_resource.php
 ```
 
 **Other Structures:** Nested or flat structures available via configuration.
 
 ## How It Works
 
-1. **Scans** all Filament resources in your application
-2. **Identifies** localizable components (fields, columns, actions, etc.)
+1. **Scans** all Filament resources, pages, and relation managers
+2. **Identifies** localizable components (fields, columns, actions, static properties, methods)
 3. **Removes** hardcoded labels and replaces with translation keys
 4. **Creates** organized translation files with default labels
-5. **Updates** resource files to use dynamic translation keys
-6. **Translates** missing keys using DeepL API (optional)
+5. **Updates** resource and page files to use dynamic translation keys
+6. **Intelligently translates** using DeepL API with smart detection:
+   - Missing keys (keys that don't exist in target language)
+   - Untranslated content (identical to source language)
+   - Skips acronyms and technical terms that should remain the same
 7. **Creates** git commit for easy reverting
 
 ## Key Features
@@ -221,10 +248,81 @@ public static function getModelLabel(): string
 ```
 
 ### DeepL Integration
+- **Smart Detection**: Automatically detects untranslated content
+- **Skip Terms**: Intelligently skips acronyms and technical terms
+- **Force Mode**: Overwrites existing translations when using `--force`
+- **Mixed Content**: Processes files with both translated and untranslated content
 - High accuracy translations with 40+ supported languages
 - Context-aware processing with formatting preservation
 - Batch processing with usage monitoring
 - Graceful error handling and fallbacks
+
+### Page Localization Support
+Now supports Filament pages with static properties and methods:
+
+```php
+// Before
+class Dashboard extends BaseDashboard
+{
+    protected static ?string $title = 'Blog Dashboard';
+    protected static ?string $navigationLabel = 'Dashboard';
+}
+
+// After
+class Dashboard extends BaseDashboard
+{
+    protected static ?string $title = null;
+    protected static ?string $navigationLabel = null;
+
+    public function getTitle(): string
+    {
+        return __('filament/admin/dashboard.title');
+    }
+
+    public static function getNavigationLabel(): string
+    {
+        return __('filament/admin/dashboard.navigation_label');
+    }
+}
+```
+
+### Smart Translation Detection
+The DeepL translation command intelligently detects what needs to be translated:
+
+**Normal Mode (Default):**
+- Translates missing keys (keys that don't exist in target language)
+- Translates keys with identical content to source (indicating untranslated content)
+- Skips terms configured in `skip_identical_terms` (e.g., "SMS", "API", "URL")
+- Preserves existing properly translated content
+
+**Force Mode (`--force`):**
+- Overwrites ALL existing translations with new ones from source language
+- Useful for complete retranslation or when source language has been updated
+
+**Example Scenarios:**
+
+```php
+// Source (English)
+return [
+    'title' => 'Blog Dashboard',
+    'navigation_label' => 'Send Email',
+    'description' => 'Manage your blog posts and comments',
+];
+
+// Target (Spanish) - Before Translation
+return [
+    'title' => 'Blog Dashboard',           // ← Will be translated (identical to source)
+    'navigation_label' => 'Send Email',    // ← Will be translated (not in skip terms)
+    'description' => 'Gestiona tus publicaciones', // ← Will be preserved (properly translated)
+];
+
+// Target (Spanish) - After Translation
+return [
+    'title' => 'Panel de Blog',            // ← Translated
+    'navigation_label' => 'Enviar Email',  // ← Translated
+    'description' => 'Gestiona tus publicaciones', // ← Preserved
+];
+```
 
 ## Language Switching
 
@@ -247,7 +345,7 @@ public function panel(Panel $panel): Panel
             FilamentLanguageSwitcherPlugin::make()
                 ->locales([
                     ['code' => 'en', 'name' => 'English', 'flag' => 'gb'],
-                    ['code' => 'el', 'name' => 'Greek', 'flag' => 'gr'],
+                    ['code' => 'es', 'name' => 'Spanish', 'flag' => 'es'],
                 ]),
         ]);
 }
@@ -275,10 +373,10 @@ The Filament admin interface displays in English with hardcoded labels:
 The same interface now supports multiple languages with proper translation keys:
 
 ![After Localization - Users List](photos/after.png)
-*Users list page with localized Greek labels*
+*Users list page with localized Spanish labels*
 
 ![After Localization - User Edit Form](photos/after-2.png)
-*User edit form with localized Greek field labels*
+*User edit form with localized Spanish field labels*
 
 ![After Localization - File Structure](photos/after-3.png)
 *File structure showing organized translation files for multiple locales*
@@ -312,8 +410,8 @@ Action::make('delete')
 // lang/en/filament/admin/user_resource.php
 return ['name' => 'Name', 'email' => 'Email', 'delete' => 'Delete'];
 
-// lang/el/filament/admin/user_resource.php  
-return ['name' => 'Όνομα', 'email' => 'Email', 'delete' => 'Διαγραφή'];
+// lang/es/filament/admin/user_resource.php  
+return ['name' => 'Nombre', 'email' => 'Email', 'delete' => 'Eliminar'];
 ```
 
 ## Safety Features
