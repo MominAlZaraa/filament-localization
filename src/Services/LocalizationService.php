@@ -6,10 +6,12 @@ use Illuminate\Support\Facades\File;
 use MominAlZaraa\FilamentLocalization\Analyzers\PageAnalyzer;
 use MominAlZaraa\FilamentLocalization\Analyzers\RelationManagerAnalyzer;
 use MominAlZaraa\FilamentLocalization\Analyzers\ResourceAnalyzer;
+use MominAlZaraa\FilamentLocalization\Analyzers\WidgetAnalyzer;
 use MominAlZaraa\FilamentLocalization\Generators\PageModifier;
 use MominAlZaraa\FilamentLocalization\Generators\RelationManagerModifier;
 use MominAlZaraa\FilamentLocalization\Generators\ResourceModifier;
 use MominAlZaraa\FilamentLocalization\Generators\TranslationFileGenerator;
+use MominAlZaraa\FilamentLocalization\Generators\WidgetModifier;
 
 class LocalizationService
 {
@@ -19,6 +21,8 @@ class LocalizationService
 
     protected RelationManagerAnalyzer $relationManagerAnalyzer;
 
+    protected WidgetAnalyzer $widgetAnalyzer;
+
     protected TranslationFileGenerator $translationGenerator;
 
     protected ResourceModifier $resourceModifier;
@@ -27,6 +31,8 @@ class LocalizationService
 
     protected RelationManagerModifier $relationManagerModifier;
 
+    protected WidgetModifier $widgetModifier;
+
     protected StatisticsService $statistics;
 
     public function __construct(?StatisticsService $statistics = null)
@@ -34,11 +40,13 @@ class LocalizationService
         $this->analyzer = new ResourceAnalyzer;
         $this->pageAnalyzer = new PageAnalyzer;
         $this->relationManagerAnalyzer = new RelationManagerAnalyzer;
+        $this->widgetAnalyzer = new WidgetAnalyzer;
         $this->statistics = $statistics ?? app(StatisticsService::class);
         $this->translationGenerator = new TranslationFileGenerator($this->statistics);
         $this->resourceModifier = new ResourceModifier($this->statistics);
         $this->pageModifier = new PageModifier($this->statistics);
         $this->relationManagerModifier = new RelationManagerModifier($this->statistics);
+        $this->widgetModifier = new WidgetModifier;
     }
 
     public function processResource(string $resourceClass, $panel, array $locales, bool $dryRun = false, bool $force = false): void
@@ -153,6 +161,41 @@ class LocalizationService
             $this->statistics->incrementColumnsLocalized(count($analysis['columns']));
         } catch (\Exception $e) {
             $this->statistics->addError("Failed to process relation manager {$relationManagerClass}: {$e->getMessage()}");
+        }
+    }
+
+    public function processWidget(string $widgetClass, $panel, array $locales, bool $dryRun = false, bool $force = false): void
+    {
+        try {
+            // Analyze the widget to find all localizable content
+            $analysis = $this->widgetAnalyzer->analyze($widgetClass, $panel);
+
+            if (empty($analysis['stats']) && ! $analysis['custom_content']) {
+                return; // Nothing to localize
+            }
+
+            // Generate translation files for each locale
+            foreach ($locales as $locale) {
+                $this->translationGenerator->generateWidgetTranslations($analysis, $panel->getId(), $locale, $dryRun);
+            }
+
+            // Modify the widget file to use translation keys
+            if (! $dryRun) {
+                $reflection = new \ReflectionClass($widgetClass);
+                $filePath = $reflection->getFileName();
+
+                if ($filePath && \File::exists($filePath)) {
+                    $content = \File::get($filePath);
+                    $modifiedContent = $this->widgetModifier->modify($content, $analysis, $panel);
+                    \File::put($filePath, $modifiedContent);
+                }
+            }
+
+            // Update statistics
+            $this->statistics->incrementResourcesProcessed();
+            $this->statistics->incrementFieldsLocalized(count($analysis['stats']));
+        } catch (\Exception $e) {
+            $this->statistics->addError("Failed to process widget {$widgetClass}: {$e->getMessage()}");
         }
     }
 }

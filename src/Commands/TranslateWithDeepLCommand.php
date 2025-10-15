@@ -209,13 +209,14 @@ class TranslateWithDeepLCommand extends Command
         $panelId = $panel->getId();
         $this->info("📦 Processing panel: {$panelId}");
 
-        // Get all resources, pages, and relation managers for this panel
+        // Get all resources, pages, relation managers, and widgets for this panel
         $resources = $panel->getResources();
         $pages = $this->getPanelPages($panel);
         $relationManagers = $this->getPanelRelationManagers($panel);
+        $widgets = $this->getPanelWidgets($panel);
 
-        // Calculate total items including resource pages
-        $totalItems = count($resources) + count($pages) + count($relationManagers);
+        // Calculate total items including resource pages and widgets
+        $totalItems = count($resources) + count($pages) + count($relationManagers) + count($widgets);
         $resourcePagesCount = 0;
         foreach ($resources as $resource) {
             $resourcePages = $this->getResourcePages($resource);
@@ -224,7 +225,7 @@ class TranslateWithDeepLCommand extends Command
         }
 
         if ($totalItems === 0) {
-            $this->warn("  ⚠️  No resources, pages, or relation managers found in panel: {$panelId}");
+            $this->warn("  ⚠️  No resources, pages, relation managers, or widgets found in panel: {$panelId}");
 
             return;
         }
@@ -259,6 +260,15 @@ class TranslateWithDeepLCommand extends Command
             $progressBar->setMessage("Translating page {$pageName}...");
 
             $this->translatePage($page, $panel, $sourceLang, $targetLang);
+            $progressBar->advance();
+        }
+
+        // Process widgets
+        foreach ($widgets as $widget) {
+            $widgetName = class_basename($widget);
+            $progressBar->setMessage("Translating widget {$widgetName}...");
+
+            $this->translateWidget($widget, $panel, $sourceLang, $targetLang);
             $progressBar->advance();
         }
 
@@ -446,6 +456,93 @@ class TranslateWithDeepLCommand extends Command
                 $this->line("  • {$error}");
             }
         }
+    }
+
+    protected function translateWidget(string $widgetClass, $panel, string $sourceLang, string $targetLang): void
+    {
+        $structure = config('filament-localization.structure', 'panel-based');
+        $prefix = config('filament-localization.translation_key_prefix', 'filament');
+        $widgetName = class_basename($widgetClass);
+
+        // Build source and target file paths
+        $sourcePath = $this->getWidgetTranslationPath($widgetName, $panel->getId(), $sourceLang, $structure, $prefix);
+        $targetPath = $this->getWidgetTranslationPath($widgetName, $panel->getId(), $targetLang, $structure, $prefix);
+
+        // Check if source file exists
+        if (! File::exists($sourcePath)) {
+            $this->warn("  ⚠️  Source file not found: {$sourcePath}");
+
+            return;
+        }
+
+        // Note: We no longer skip existing files - let the enhanced logic decide what to translate
+
+        // Load source translations
+        $sourceTranslations = include $sourcePath;
+        if (! is_array($sourceTranslations)) {
+            $this->warn("  ⚠️  Invalid source file format: {$sourcePath}");
+
+            return;
+        }
+
+        // Load existing target translations if file exists
+        $existingTargetTranslations = [];
+        if (File::exists($targetPath)) {
+            $existingTargetTranslations = include $targetPath;
+            if (! is_array($existingTargetTranslations)) {
+                $this->warn("  ⚠️  Invalid target file format: {$targetPath}");
+
+                return;
+            }
+        }
+
+        // Determine what to translate based on force mode
+        if ($this->option('force')) {
+            // Force mode: translate ALL source translations, overwriting existing ones
+            $translationsToTranslate = $sourceTranslations;
+            $finalTranslations = $this->deepLService->translateArray($translationsToTranslate, $sourceLang, $targetLang);
+        } else {
+            // Normal mode: translate missing keys OR keys with identical content to source
+            $translationsToTranslate = [];
+            $skipTerms = config('filament-localization.skip_identical_terms', []);
+
+            foreach ($sourceTranslations as $key => $value) {
+                $needsTranslation = false;
+
+                if (! array_key_exists($key, $existingTargetTranslations)) {
+                    // Key doesn't exist - needs translation
+                    $needsTranslation = true;
+                } elseif ($existingTargetTranslations[$key] === $value) {
+                    // Key exists but has same content as source - check if it should be skipped
+                    if (! $this->shouldSkipTerm($value, $skipTerms)) {
+                        $needsTranslation = true;
+                    }
+                }
+
+                if ($needsTranslation) {
+                    $translationsToTranslate[$key] = $value;
+                }
+            }
+
+            if (empty($translationsToTranslate)) {
+                $this->info("  ✅ All translations already exist for {$widgetName}");
+
+                return;
+            }
+
+            // Translate the selected keys
+            $translatedTexts = $this->deepLService->translateArray($translationsToTranslate, $sourceLang, $targetLang);
+            $finalTranslations = array_merge($existingTargetTranslations, $translatedTexts);
+        }
+
+        // Generate PHP array content
+        $content = $this->generatePhpArrayContent($finalTranslations);
+
+        // Write to target file
+        File::put($targetPath, $content);
+
+        $this->info("  ✅ Translated {$widgetName} successfully");
+        $this->statisticsService->incrementFilesModified();
     }
 
     protected function translatePage(string $pageClass, $panel, string $sourceLang, string $targetLang): void
@@ -805,6 +902,151 @@ class TranslateWithDeepLCommand extends Command
         }
 
         return '';
+    }
+
+    protected function getWidgetTranslationPath(string $widgetName, string $panelId, string $locale, string $structure, string $prefix): string
+    {
+        $basePath = lang_path($locale);
+
+        return match ($structure) {
+            'flat' => "{$basePath}/{$prefix}.php",
+            'nested' => "{$basePath}/{$prefix}/" . \Illuminate\Support\Str::snake($widgetName) . '.php',
+            'panel-based' => "{$basePath}/{$prefix}/{$panelId}/" . \Illuminate\Support\Str::snake($widgetName) . '.php',
+            default => "{$basePath}/{$prefix}/{$panelId}/" . \Illuminate\Support\Str::snake($widgetName) . '.php',
+        };
+    }
+
+    protected function getPanelWidgets($panel): array
+    {
+        $widgets = [];
+
+        try {
+            // Get all resources for this panel
+            $resources = $panel->getResources();
+
+            foreach ($resources as $resource) {
+                // Get widgets from the resource
+                $resourceWidgets = $this->getResourceWidgets($resource);
+                $widgets = array_merge($widgets, $resourceWidgets);
+            }
+
+            // Get widgets from pages (check ALL pages, not just custom pages)
+            $allPages = $panel->getPages();
+            foreach ($allPages as $page) {
+                $pageWidgets = $this->getPageWidgets($page);
+                $widgets = array_merge($widgets, $pageWidgets);
+            }
+
+            // Remove duplicates
+            $widgets = array_unique($widgets);
+        } catch (\Exception $e) {
+            // Silently fail if we can't get widgets
+        }
+
+        return $widgets;
+    }
+
+    protected function getResourceWidgets(string $resourceClass): array
+    {
+        $widgets = [];
+
+        try {
+            $reflection = new \ReflectionClass($resourceClass);
+            $filePath = $reflection->getFileName();
+
+            if (! $filePath || ! File::exists($filePath)) {
+                return $widgets;
+            }
+
+            $content = File::get($filePath);
+
+            // Look for getWidgets method
+            if (preg_match('/public\s+function\s+getWidgets\s*\(\s*\)\s*:\s*array\s*\{([^}]+)\}/s', $content, $matches)) {
+                $widgetsContent = $matches[1];
+
+                // Extract widget class names
+                if (preg_match_all('/([A-Z][a-zA-Z0-9_]*Widget)::class/', $widgetsContent, $widgetMatches)) {
+                    foreach ($widgetMatches[1] as $widgetClass) {
+                        $resolvedClass = $this->resolveWidgetClass($widgetClass, $resourceClass, $content);
+                        if ($resolvedClass) {
+                            $widgets[] = $resolvedClass;
+                        }
+                    }
+                }
+            }
+        } catch (\Exception $e) {
+            // Silently fail if we can't analyze the resource
+        }
+
+        return $widgets;
+    }
+
+    protected function getPageWidgets(string $pageClass): array
+    {
+        $widgets = [];
+
+        try {
+            $reflection = new \ReflectionClass($pageClass);
+            $filePath = $reflection->getFileName();
+
+            if (! $filePath || ! File::exists($filePath)) {
+                return $widgets;
+            }
+
+            $content = File::get($filePath);
+
+            // Look for getWidgets method
+            if (preg_match('/public\s+function\s+getWidgets\s*\(\s*\)\s*:\s*array\s*\{([^}]+)\}/s', $content, $matches)) {
+                $widgetsContent = $matches[1];
+
+                // Extract widget class names
+                if (preg_match_all('/([A-Z][a-zA-Z0-9_]*Widget)::class/', $widgetsContent, $widgetMatches)) {
+                    foreach ($widgetMatches[1] as $widgetClass) {
+                        $resolvedClass = $this->resolveWidgetClass($widgetClass, $pageClass, $content);
+                        if ($resolvedClass) {
+                            $widgets[] = $resolvedClass;
+                        }
+                    }
+                }
+            }
+        } catch (\Exception $e) {
+            // Silently fail if we can't analyze the page
+        }
+
+        return $widgets;
+    }
+
+    protected function resolveWidgetClass(string $widgetClass, string $parentClass, string $content): ?string
+    {
+        // If the class name doesn't have a namespace, we need to resolve it from the use statements
+        if (! str_contains($widgetClass, '\\')) {
+            // Extract use statements from the content
+            preg_match_all('/use\s+([^;]+);/', $content, $useMatches);
+
+            foreach ($useMatches[1] as $useStatement) {
+                if (str_ends_with($useStatement, '\\' . $widgetClass) || $useStatement === $widgetClass) {
+                    return $useStatement;
+                }
+
+                // Handle aliased imports (use X as Y)
+                if (preg_match('/(.+)\s+as\s+(.+)/', $useStatement, $aliasMatch)) {
+                    if (trim($aliasMatch[2]) === $widgetClass) {
+                        return trim($aliasMatch[1]);
+                    }
+                }
+            }
+
+            // If not found in use statements, try to construct the namespace from the parent class
+            $parentNamespace = (new \ReflectionClass($parentClass))->getNamespaceName();
+            $widgetNamespace = str_replace(['Resources', 'Pages'], 'Widgets', $parentNamespace);
+            $fullWidgetClass = $widgetNamespace . '\\' . $widgetClass;
+
+            if (class_exists($fullWidgetClass)) {
+                return $fullWidgetClass;
+            }
+        }
+
+        return class_exists($widgetClass) ? $widgetClass : null;
     }
 
     protected function shouldSkipTerm(string $value, array $skipTerms): bool
