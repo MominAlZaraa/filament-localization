@@ -276,7 +276,7 @@ class PageAnalyzer
     protected function hasLabel(string $content, string $fieldName, string $component): bool
     {
         // Look for ->label() after the make() call for this specific field
-        $makePattern = "/(?<![:\w]){$component}::make\(['\"]" . preg_quote($fieldName, '/') . "['\"]\)/";
+        $makePattern = "/(?<![:\w]){$component}::make\(['\"]".preg_quote($fieldName, '/')."['\"]\)/";
 
         if (! preg_match($makePattern, $content, $matches, PREG_OFFSET_CAPTURE)) {
             return false;
@@ -342,7 +342,7 @@ class PageAnalyzer
         ];
 
         foreach ($labelMethods as $method => $type) {
-            if (preg_match('/public\s+function\s+' . $method . '\s*\([^)]*\)\s*:\s*[^{]*{[^}]*return\s+[\'"]([^\'"]+)[\'"]/', $content, $matches)) {
+            if (preg_match('/public\s+function\s+'.$method.'\s*\([^)]*\)\s*:\s*[^{]*{[^}]*return\s+[\'"]([^\'"]+)[\'"]/', $content, $matches)) {
                 $labels[] = [
                     'method' => $method,
                     'type' => $type,
@@ -371,7 +371,7 @@ class PageAnalyzer
         ];
 
         foreach ($navigationMethods as $method => $type) {
-            if (preg_match('/public\s+(?:static\s+)?function\s+' . $method . '\s*\([^)]*\)\s*:\s*[^{]*{[^}]*return\s+[\'"]([^\'"]+)[\'"]/', $content, $matches)) {
+            if (preg_match('/public\s+(?:static\s+)?function\s+'.$method.'\s*\([^)]*\)\s*:\s*[^{]*{[^}]*return\s+[\'"]([^\'"]+)[\'"]/', $content, $matches)) {
                 $navigation[] = [
                     'method' => $method,
                     'type' => $type,
@@ -398,7 +398,7 @@ class PageAnalyzer
         ];
 
         foreach ($titleProperties as $property => $type) {
-            if (preg_match('/protected\s+static\s+\?string\s+\$' . $property . '\s*=\s*[\'"]([^\'"]+)[\'"]/', $content, $matches)) {
+            if (preg_match('/protected\s+static\s+\?string\s+\$'.$property.'\s*=\s*[\'"]([^\'"]+)[\'"]/', $content, $matches)) {
                 $titles[] = [
                     'property' => $property,
                     'type' => $type,
