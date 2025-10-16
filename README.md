@@ -373,10 +373,10 @@ The Filament admin interface displays in English with hardcoded labels:
 The same interface now supports multiple languages with proper translation keys:
 
 ![After Localization - Users List](photos/after.png)
-*Users list page with localized Spanish labels*
+*Users list page with localized Greek labels*
 
 ![After Localization - User Edit Form](photos/after-2.png)
-*User edit form with localized Spanish field labels*
+*User edit form with localized Greek field labels*
 
 ![After Localization - File Structure](photos/after-3.png)
 *File structure showing organized translation files for multiple locales*
