@@ -1,8 +1,9 @@
 {
     "name": "mominalzaraa/filament-localization",
-    "description": "Automatically scan and localize Filament resources with structured translation files",
+    "description": "The first and only automatic Filament localization package with intelligent resource scanning, structured translation files, and comprehensive testing",
     "type": "library",
     "keywords": [
+        "mominalzaraa",
         "filament",
         "laravel",
         "localization",
@@ -10,7 +11,11 @@
         "i18n",
         "multilingual",
         "php",
-        "package"
+        "package",
+        "automatic",
+        "testing",
+        "quality",
+        "original"
     ],
     "homepage": "https://github.com/MominAlZaraa/filament-localization",
     "readme": "README.md",
@@ -25,7 +30,8 @@
     ],
     "support": {
         "issues": "https://github.com/MominAlZaraa/filament-localization/issues",
-        "source": "https://github.com/MominAlZaraa/filament-localization"
+        "source": "https://github.com/MominAlZaraa/filament-localization",
+        "email": "support@mominpert.com"
     },
     "require": {
         "php": "^8.2|^8.3|^8.4",
