@@ -6,10 +6,13 @@
 [![Code Style](https://img.shields.io/github/actions/workflow/status/MominAlZaraa/filament-localization/code-style.yml?branch=main&label=code%20style&style=flat-square&logo=github)](https://github.com/MominAlZaraa/filament-localization/actions/workflows/code-style.yml)
 [![License](https://img.shields.io/packagist/l/mominalzaraa/filament-localization?style=flat-square)](https://github.com/MominAlZaraa/filament-localization/blob/main/LICENSE)
 [![PHP Version](https://img.shields.io/packagist/dependency-v/mominalzaraa/filament-localization/php?style=flat-square&logo=php)](https://packagist.org/packages/mominalzaraa/filament-localization)
+[![Sponsor](https://img.shields.io/github/sponsors/MominAlZaraa?style=flat-square&logo=github)](https://github.com/sponsors/MominAlZaraa)
 
 ![Filament Localization Banner](.github/plugin-banner.jpg)
 
-Automatically scan and localize Filament resources with structured translation files. This package eliminates the repetitive task of manually adding translation keys to every field, column, action, and component in your Filament application.
+**The first and only automatic Filament localization package** with intelligent resource scanning, structured translation files, and comprehensive testing. This package eliminates the repetitive task of manually adding translation keys to every field, column, action, and component in your Filament application.
+
+**This is the original and only package that provides automatic localization with translation features for Filament.**
 
 **Requirements**: PHP ^8.2|^8.3|^8.4 | Laravel ^12.0 | Filament ^4.0
 
@@ -430,6 +433,17 @@ composer test
 ## Contributing
 
 Contributions are welcome! Please feel free to submit a Pull Request.
+
+## 💖 Support & Funding
+
+If this package has helped you, please consider supporting its development:
+
+- ⭐ **Star the repository** on GitHub
+- 🐛 **Report bugs** and suggest features
+- 💰 **Sponsor the project** on [GitHub Sponsors](https://github.com/sponsors/MominAlZaraa)
+- 📧 **Email**: [support@mominpert.com](mailto:support@mominpert.com)
+- 🌐 **Website**: [mominpert.com](https://mominpert.com)
+- 💬 **GitHub Issues**: [Report an issue](https://github.com/MominAlZaraa/filament-localization/issues)
 
 ## Support
 
