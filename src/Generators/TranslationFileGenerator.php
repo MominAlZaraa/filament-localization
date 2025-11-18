@@ -15,7 +15,7 @@ class TranslationFileGenerator
         $this->statistics = $statistics ?? app(StatisticsService::class);
     }
 
-    public function generate(array $analysis, string $panelId, string $locale, bool $dryRun = false): void
+    public function generate(array $analysis, string $panelId, string $locale, bool $dryRun = false, bool $force = false): void
     {
         $structure = config('filament-localization.structure', 'panel-based');
 
@@ -45,8 +45,15 @@ class TranslationFileGenerator
             $existingTranslations = include $translationPath;
         }
 
-        // Merge translations intelligently - preserve existing translations and only add missing keys
-        $mergedTranslations = $this->mergeTranslationsIntelligently($existingTranslations, $translations);
+        // Handle force mode
+        if ($force) {
+            // In force mode, use translations directly (overwriting) and also get translations from other panels
+            $otherPanelTranslations = $this->getOtherPanelTranslations($analysis, $panelId, $locale, $structure);
+            $mergedTranslations = array_merge($otherPanelTranslations, $translations);
+        } else {
+            // Merge translations intelligently - preserve existing translations and only add missing keys
+            $mergedTranslations = $this->mergeTranslationsIntelligently($existingTranslations, $translations);
+        }
 
         // Sort translations alphabetically
         ksort($mergedTranslations);
@@ -226,7 +233,7 @@ class TranslationFileGenerator
         return $label;
     }
 
-    public function generatePageTranslations(array $analysis, string $panelId, string $locale, bool $dryRun = false): void
+    public function generatePageTranslations(array $analysis, string $panelId, string $locale, bool $dryRun = false, bool $force = false): void
     {
         $structure = config('filament-localization.structure', 'panel-based');
 
@@ -256,8 +263,20 @@ class TranslationFileGenerator
             $existingTranslations = include $translationPath;
         }
 
-        // Merge translations intelligently - preserve existing translations and only add missing keys
-        $mergedTranslations = $this->mergeTranslationsIntelligently($existingTranslations, $translations);
+        // In force mode, override existing translations with new ones
+        if ($force) {
+            // Check if there are existing translations from another panel that we should copy
+            $otherPanelTranslations = $this->getOtherPanelTranslations($analysis, $panelId, $locale, $structure);
+            if (! empty($otherPanelTranslations)) {
+                // Merge the new translations with the existing ones from other panels
+                $mergedTranslations = array_merge($otherPanelTranslations, $translations);
+            } else {
+                $mergedTranslations = $translations;
+            }
+        } else {
+            // Merge translations intelligently - preserve existing translations and only add missing keys
+            $mergedTranslations = $this->mergeTranslationsIntelligently($existingTranslations, $translations);
+        }
 
         // Sort translations alphabetically
         ksort($mergedTranslations);
@@ -278,7 +297,44 @@ class TranslationFileGenerator
         $this->statistics->incrementTranslationKeysAdded(count($translations));
     }
 
-    public function generateRelationManagerTranslations(array $analysis, string $panelId, string $locale, bool $dryRun = false): void
+    protected function getOtherPanelTranslations(array $analysis, string $panelId, string $locale, string $structure): array
+    {
+        $basePath = lang_path($locale);
+        $prefix = config('filament-localization.translation_key_prefix', 'filament');
+
+        // Determine the name to use based on what's available in the analysis array
+        if (isset($analysis['page_name'])) {
+            $fileName = Str::snake($analysis['page_name']);
+        } elseif (isset($analysis['resource_name'])) {
+            $fileName = Str::snake($analysis['resource_name']);
+        } elseif (isset($analysis['relation_manager_name'])) {
+            $fileName = Str::snake($analysis['relation_manager_name']);
+        } else {
+            return []; // No recognizable name found
+        }
+
+        // Look for similar file names in other panels
+        $possiblePanels = ['doctor', 'Doctor', 'admin', 'Admin', 'dentist', 'Dentist', 'nurse', 'Nurse', 'patient', 'Patient', 'reception', 'Reception'];
+
+        foreach ($possiblePanels as $otherPanel) {
+            if ($otherPanel === $panelId) {
+                continue; // Skip current panel
+            }
+
+            $otherPanelPath = "{$basePath}/{$prefix}/{$otherPanel}/{$fileName}.php";
+
+            if (File::exists($otherPanelPath)) {
+                $otherTranslations = include $otherPanelPath;
+                if (is_array($otherTranslations) && ! empty($otherTranslations)) {
+                    return $otherTranslations;
+                }
+            }
+        }
+
+        return [];
+    }
+
+    public function generateRelationManagerTranslations(array $analysis, string $panelId, string $locale, bool $dryRun = false, bool $force = false): void
     {
         $structure = config('filament-localization.structure', 'panel-based');
 
@@ -308,8 +364,15 @@ class TranslationFileGenerator
             $existingTranslations = include $translationPath;
         }
 
-        // Merge translations intelligently - preserve existing translations and only add missing keys
-        $mergedTranslations = $this->mergeTranslationsIntelligently($existingTranslations, $translations);
+        // Handle force mode
+        if ($force) {
+            // In force mode, use translations directly (overwriting) and also get translations from other panels
+            $otherPanelTranslations = $this->getOtherPanelTranslations($analysis, $panelId, $locale, $structure);
+            $mergedTranslations = array_merge($otherPanelTranslations, $translations);
+        } else {
+            // Merge translations intelligently - preserve existing translations and only add missing keys
+            $mergedTranslations = $this->mergeTranslationsIntelligently($existingTranslations, $translations);
+        }
 
         // Sort translations alphabetically
         ksort($mergedTranslations);
@@ -330,7 +393,7 @@ class TranslationFileGenerator
         $this->statistics->incrementTranslationKeysAdded(count($translations));
     }
 
-    public function generateWidgetTranslations(array $analysis, string $panelId, string $locale, bool $dryRun = false): void
+    public function generateWidgetTranslations(array $analysis, string $panelId, string $locale, bool $dryRun = false, bool $force = false): void
     {
         $structure = config('filament-localization.structure', 'panel-based');
 
@@ -360,8 +423,15 @@ class TranslationFileGenerator
             $existingTranslations = include $translationPath;
         }
 
-        // Merge translations intelligently - preserve existing translations and only add missing keys
-        $mergedTranslations = $this->mergeTranslationsIntelligently($existingTranslations, $translations);
+        // Handle force mode
+        if ($force) {
+            // In force mode, use translations directly (overwriting) and also get translations from other panels
+            $otherPanelTranslations = $this->getOtherPanelTranslations($analysis, $panelId, $locale, $structure);
+            $mergedTranslations = array_merge($otherPanelTranslations, $translations);
+        } else {
+            // Merge translations intelligently - preserve existing translations and only add missing keys
+            $mergedTranslations = $this->mergeTranslationsIntelligently($existingTranslations, $translations);
+        }
 
         // Sort translations alphabetically
         ksort($mergedTranslations);
@@ -380,6 +450,29 @@ class TranslationFileGenerator
         }
 
         $this->statistics->incrementTranslationKeysAdded(count($translations));
+    }
+
+    protected function getOtherPanelWidgetTranslations(array $analysis, string $panelId, string $locale): array
+    {
+        $otherPanels = ['doctor', 'Dentist', 'Admin', 'Patient', 'Nurse', 'Reception'];
+        $allTranslations = [];
+        $widgetName = Str::snake($analysis['widget_name']);
+
+        foreach ($otherPanels as $otherPanel) {
+            if ($otherPanel === $panelId) {
+                continue;
+            }
+
+            $otherPanelPath = $this->getWidgetTranslationPath($analysis, $otherPanel, $locale, 'panel-based');
+            if (File::exists($otherPanelPath)) {
+                $otherTranslations = include $otherPanelPath;
+                if (is_array($otherTranslations)) {
+                    $allTranslations = array_merge($allTranslations, $otherTranslations);
+                }
+            }
+        }
+
+        return $allTranslations;
     }
 
     protected function getPageTranslationPath(array $analysis, string $panelId, string $locale, string $structure): string
@@ -481,11 +574,26 @@ class TranslationFileGenerator
             }
         }
 
-        // Add default title if no title exists
-        if (empty($analysis['labels']) && empty($analysis['titles'])) {
+        // For Pages, always ensure we have title and navigation_label
+        if (($analysis['is_page'] ?? false) === true) {
+            $pageName = $analysis['page_name'];
+            $defaultTitle = $this->generateDefaultTitle($pageName);
+
+            // Only add if not already set in translations
+            if (! isset($translations['title'])) {
+                $translations['title'] = $defaultTitle;
+            }
+
+            if (! isset($translations['navigation_label'])) {
+                $translations['navigation_label'] = $defaultTitle;
+            }
+        }
+        // Add default title if no title exists for non-Pages
+        elseif (empty($analysis['labels']) && empty($analysis['titles'])) {
             $pageName = $analysis['page_name'];
             $defaultTitle = $this->generateDefaultTitle($pageName);
             $translations['title'] = $defaultTitle;
+            $translations['navigation_label'] = $defaultTitle;
         }
 
         return $translations;

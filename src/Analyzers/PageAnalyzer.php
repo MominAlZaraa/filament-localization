@@ -36,7 +36,7 @@ class PageAnalyzer
         'BulkAction',
     ];
 
-    public function analyze(string $pageClass, $panel): array
+    public function analyze(string $pageClass, $panel, bool $force = false): array
     {
         $reflection = new ReflectionClass($pageClass);
         $filePath = $reflection->getFileName();
@@ -47,11 +47,17 @@ class PageAnalyzer
 
         $content = File::get($filePath);
 
+        // Check if this is a Page class by namespace or extends Page
+        $isPage = str_contains($pageClass, '\\Pages\\') ||
+            preg_match('/class\s+\w+\s+extends\s+[\\\\]?Page\b/', $content) ||
+            is_subclass_of($pageClass, \Filament\Pages\Page::class);
+
         $analysis = [
             'page_class' => $pageClass,
             'page_name' => class_basename($pageClass),
             'file_path' => $filePath,
             'panel_id' => $panel->getId(),
+            'is_page' => $isPage,
             'infolist_entries' => [],
             'actions' => [],
             'sections' => [],
@@ -65,7 +71,8 @@ class PageAnalyzer
         // Check if this page has custom content that needs localization
         $analysis['has_custom_content'] = $this->hasCustomContent($content);
 
-        if (! $analysis['has_custom_content']) {
+        // If no custom content and not in force mode, return early
+        if (! $analysis['has_custom_content'] && ! $force) {
             return $analysis;
         }
 
@@ -131,11 +138,21 @@ class PageAnalyzer
             '/protected\s+static\s+\?string\s+\$navigationIcon\s*=\s*[\'"][^\'"]+[\'"]/',
             '/protected\s+static\s+\?string\s+\$navigationGroup\s*=\s*[\'"][^\'"]+[\'"]/',
 
+            // Static properties with null values that may need localization methods
+            '/protected\s+static\s+\?string\s+\$(?:title|navigationLabel|navigationIcon|navigationGroup)\s*=\s*null/',
+
             // Method returns with hardcoded strings
             '/public\s+(?:static\s+)?function\s+getTitle\s*\([^)]*\)\s*:\s*[^{]*{[^}]*return\s+[\'"][^\'"]+[\'"]/',
             '/public\s+(?:static\s+)?function\s+getHeading\s*\([^)]*\)\s*:\s*[^{]*{[^}]*return\s+[\'"][^\'"]+[\'"]/',
             '/public\s+(?:static\s+)?function\s+getSubheading\s*\([^)]*\)\s*:\s*[^{]*{[^}]*return\s+[\'"][^\'"]+[\'"]/',
             '/public\s+(?:static\s+)?function\s+getNavigationLabel\s*\([^)]*\)\s*:\s*[^{]*{[^}]*return\s+[\'"][^\'"]+[\'"]/',
+
+            // Translation keys that might need panel reference updates
+            '/__\([\'"]filament\/[^\/]+\/[^\'"]+[\'"]\)/',
+
+            // Check for Filament page class (pages should be localized by default)
+            '/extends\s+Page\b/',
+            '/class\s+[a-zA-Z0-9_]+\s+extends\s+Page\b/',
         ];
 
         foreach ($patterns as $pattern) {
@@ -342,12 +359,24 @@ class PageAnalyzer
         ];
 
         foreach ($labelMethods as $method => $type) {
+            // Check for hardcoded strings
             if (preg_match('/public\s+function\s+'.$method.'\s*\([^)]*\)\s*:\s*[^{]*{[^}]*return\s+[\'"]([^\'"]+)[\'"]/', $content, $matches)) {
                 $labels[] = [
                     'method' => $method,
                     'type' => $type,
                     'value' => $matches[1],
                     'has_translation' => str_contains($matches[1], '__('),
+                    'translation_key' => $this->generateTranslationKey($type),
+                    'is_static' => false,
+                ];
+            }
+            // Check for translation functions
+            elseif (preg_match('/public\s+function\s+'.$method.'\s*\([^)]*\)\s*:\s*[^{]*{[^}]*return\s+__\([\'"]([^\'"]+)[\'"]\)/', $content, $matches)) {
+                $labels[] = [
+                    'method' => $method,
+                    'type' => $type,
+                    'value' => $matches[1],
+                    'has_translation' => true,
                     'translation_key' => $this->generateTranslationKey($type),
                     'is_static' => false,
                 ];
@@ -371,12 +400,23 @@ class PageAnalyzer
         ];
 
         foreach ($navigationMethods as $method => $type) {
+            // Check for hardcoded strings
             if (preg_match('/public\s+(?:static\s+)?function\s+'.$method.'\s*\([^)]*\)\s*:\s*[^{]*{[^}]*return\s+[\'"]([^\'"]+)[\'"]/', $content, $matches)) {
                 $navigation[] = [
                     'method' => $method,
                     'type' => $type,
                     'value' => $matches[1],
                     'has_translation' => str_contains($matches[1], '__('),
+                    'translation_key' => $this->generateTranslationKey($type),
+                ];
+            }
+            // Check for translation functions
+            elseif (preg_match('/public\s+(?:static\s+)?function\s+'.$method.'\s*\([^)]*\)\s*:\s*[^{]*{[^}]*return\s+__\([\'"]([^\'"]+)[\'"]\)/', $content, $matches)) {
+                $navigation[] = [
+                    'method' => $method,
+                    'type' => $type,
+                    'value' => $matches[1],
+                    'has_translation' => true,
                     'translation_key' => $this->generateTranslationKey($type),
                 ];
             }

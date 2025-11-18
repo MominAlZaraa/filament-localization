@@ -6,17 +6,22 @@ use Illuminate\Support\Str;
 
 class WidgetModifier
 {
-    public function modify(string $content, array $analysis, $panel): string
+    public function modify(string $content, array $analysis, $panel, bool $force = false): string
     {
-        $content = $this->modifyStats($content, $analysis, $panel);
+        $content = $this->modifyStats($content, $analysis, $panel, $force);
+
+        // If force mode is enabled, update any existing translation keys to use the correct panel
+        if ($force) {
+            $content = $this->updateTranslationKeysToCorrectPanel($content, $panel);
+        }
 
         return $content;
     }
 
-    protected function modifyStats(string $content, array $analysis, $panel): string
+    protected function modifyStats(string $content, array $analysis, $panel, bool $force = false): string
     {
         foreach ($analysis['stats'] as $stat) {
-            if ($stat['has_translation']) {
+            if ($stat['has_translation'] && ! $force) {
                 continue;
             }
 
@@ -39,6 +44,25 @@ class WidgetModifier
                 $replacement = '->$1(__(\''.$translationKey.'\'))';
                 $content = preg_replace($pattern, $replacement, $content, 1);
             }
+        }
+
+        return $content;
+    }
+
+    protected function updateTranslationKeysToCorrectPanel(string $content, $panel): string
+    {
+        $currentPanelId = $panel->getId();
+        $otherPanels = ['doctor', 'Dentist', 'Admin', 'Patient', 'Nurse', 'Reception'];
+
+        foreach ($otherPanels as $otherPanel) {
+            if ($otherPanel === $currentPanelId) {
+                continue;
+            }
+
+            // Replace __('filament/{otherPanel}/...') with __('filament/{currentPanelId}/...')
+            $pattern = "/__\(['\"]filament\/{$otherPanel}\/([^'\"]+)['\"]\)/";
+            $replacement = "__('filament/{$currentPanelId}/\$1')";
+            $content = preg_replace($pattern, $replacement, $content);
         }
 
         return $content;
