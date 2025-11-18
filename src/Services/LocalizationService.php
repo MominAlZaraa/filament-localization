@@ -65,7 +65,8 @@ class LocalizationService
                     $analysis,
                     $panel->getId(),
                     $locale,
-                    $dryRun
+                    $dryRun,
+                    $force
                 );
             }
 
@@ -87,18 +88,31 @@ class LocalizationService
         }
     }
 
-    public function processPage(string $pageClass, $panel, array $locales, bool $dryRun = false): void
+    public function processPage(string $pageClass, $panel, array $locales, bool $dryRun = false, bool $force = false): void
     {
         try {
             // Analyze the page to find all localizable content
-            $analysis = $this->pageAnalyzer->analyze($pageClass, $panel);
+            $analysis = $this->pageAnalyzer->analyze($pageClass, $panel, $force);
 
-            if (! $analysis['has_custom_content']) {
-                return; // No custom content to localize
+            // Always process if it's a Page class (Filament Page)
+            $isFilamentPage = $analysis['is_page'] ?? false;
+
+            // Skip if not a Page class and no custom content (unless force mode)
+            if (! $isFilamentPage && ! $analysis['has_custom_content'] && ! $force) {
+                return; // No custom content to localize and not a Page class
             }
 
-            if (empty($analysis['infolist_entries']) && empty($analysis['actions']) && empty($analysis['sections']) && empty($analysis['custom_content']) && empty($analysis['titles']) && empty($analysis['labels']) && empty($analysis['navigation'])) {
-                return; // Nothing to localize
+            // Skip if not a Page class, nothing to localize, and not in force mode
+            $hasContent = ! empty($analysis['infolist_entries']) ||
+                ! empty($analysis['actions']) ||
+                ! empty($analysis['sections']) ||
+                ! empty($analysis['custom_content']) ||
+                ! empty($analysis['titles']) ||
+                ! empty($analysis['labels']) ||
+                ! empty($analysis['navigation']);
+
+            if (! $isFilamentPage && ! $hasContent && ! $force) {
+                return; // Nothing to localize, not in force mode, not a Page class
             }
 
             // Generate translation files for each locale
@@ -107,13 +121,14 @@ class LocalizationService
                     $analysis,
                     $panel->getId(),
                     $locale,
-                    $dryRun
+                    $dryRun,
+                    $force
                 );
             }
 
             // Modify the page file to use translation keys
             if (! $dryRun) {
-                $this->pageModifier->modify($pageClass, $analysis, $panel);
+                $this->pageModifier->modify($pageClass, $analysis, $panel, $force);
             }
 
             // Update statistics
@@ -125,17 +140,17 @@ class LocalizationService
         }
     }
 
-    public function processRelationManager(string $relationManagerClass, $panel, array $locales, bool $dryRun = false): void
+    public function processRelationManager(string $relationManagerClass, $panel, array $locales, bool $dryRun = false, bool $force = false): void
     {
         try {
             // Analyze the relation manager to find all localizable content
-            $analysis = $this->relationManagerAnalyzer->analyze($relationManagerClass, $panel);
+            $analysis = $this->relationManagerAnalyzer->analyze($relationManagerClass, $panel, $force);
 
-            if (! $analysis['has_custom_content']) {
+            if (! $analysis['has_custom_content'] && ! $force) {
                 return; // No custom content to localize
             }
 
-            if (empty($analysis['fields']) && empty($analysis['columns']) && empty($analysis['actions']) && empty($analysis['sections']) && empty($analysis['filters'])) {
+            if (empty($analysis['fields']) && empty($analysis['columns']) && empty($analysis['actions']) && empty($analysis['sections']) && empty($analysis['filters']) && ! $force) {
                 return; // Nothing to localize
             }
 
@@ -145,13 +160,14 @@ class LocalizationService
                     $analysis,
                     $panel->getId(),
                     $locale,
-                    $dryRun
+                    $dryRun,
+                    $force
                 );
             }
 
             // Modify the relation manager file to use translation keys
             if (! $dryRun) {
-                $this->relationManagerModifier->modify($relationManagerClass, $analysis, $panel);
+                $this->relationManagerModifier->modify($relationManagerClass, $analysis, $panel, $force);
             }
 
             // Update statistics
@@ -176,7 +192,7 @@ class LocalizationService
 
             // Generate translation files for each locale
             foreach ($locales as $locale) {
-                $this->translationGenerator->generateWidgetTranslations($analysis, $panel->getId(), $locale, $dryRun);
+                $this->translationGenerator->generateWidgetTranslations($analysis, $panel->getId(), $locale, $dryRun, $force);
             }
 
             // Modify the widget file to use translation keys
@@ -186,7 +202,7 @@ class LocalizationService
 
                 if ($filePath && File::exists($filePath)) {
                     $content = File::get($filePath);
-                    $modifiedContent = $this->widgetModifier->modify($content, $analysis, $panel);
+                    $modifiedContent = $this->widgetModifier->modify($content, $analysis, $panel, $force);
                     File::put($filePath, $modifiedContent);
                 }
             }

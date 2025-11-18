@@ -57,19 +57,24 @@ class ResourceModifier
         }
 
         // Modify form fields in resource file
-        $content = $this->modifyFields($content, $resourceFields, $analysis, $panel);
+        $content = $this->modifyFields($content, $resourceFields, $analysis, $panel, $force);
 
         // Modify table columns in resource file
-        $content = $this->modifyColumns($content, $resourceColumns, $analysis, $panel);
+        $content = $this->modifyColumns($content, $resourceColumns, $analysis, $panel, $force);
 
         // Modify actions
-        $content = $this->modifyActions($content, $analysis['actions'], $analysis, $panel);
+        $content = $this->modifyActions($content, $analysis['actions'], $analysis, $panel, $force);
 
         // Modify sections
-        $content = $this->modifySections($content, $analysis['sections'], $analysis, $panel);
+        $content = $this->modifySections($content, $analysis['sections'], $analysis, $panel, $force);
 
         // Modify filters
-        $content = $this->modifyFilters($content, $analysis['filters'], $analysis, $panel);
+        $content = $this->modifyFilters($content, $analysis['filters'], $analysis, $panel, $force);
+
+        // In force mode, update existing translation keys to use correct panel reference
+        if ($force) {
+            $content = $this->updateTranslationKeysToCorrectPanel($content, $analysis, $panel);
+        }
 
         // Only write if content changed
         if ($content !== $originalContent) {
@@ -78,10 +83,10 @@ class ResourceModifier
         }
 
         // Modify schema files
-        $this->modifySchemaFiles($schemaFileFields, $schemaFileColumns, $analysis, $panel);
+        $this->modifySchemaFiles($schemaFileFields, $schemaFileColumns, $analysis, $panel, $force);
     }
 
-    protected function modifyFields(string $content, array $fields, array $analysis, $panel): string
+    protected function modifyFields(string $content, array $fields, array $analysis, $panel, bool $force = false): string
     {
         foreach ($fields as $field) {
             // Skip if preserve existing labels is enabled and field has a label
@@ -158,20 +163,20 @@ class ResourceModifier
 
                 // Only modify if not all options have translations
                 if (! $allOptionsHaveTranslations) {
-                    $content = $this->modifySelectOptions($content, $field, $analysis, $panel);
+                    $content = $this->modifySelectOptions($content, $field, $analysis, $panel, $force);
                 }
             }
 
             // Handle default values for any field
             if ($field['has_default']) {
-                $content = $this->modifyDefaultValue($content, $field, $analysis, $panel);
+                $content = $this->modifyDefaultValue($content, $field, $analysis, $panel, $force);
             }
         }
 
         return $content;
     }
 
-    protected function modifySelectOptions(string $content, array $field, array $analysis, $panel): string
+    protected function modifySelectOptions(string $content, array $field, array $analysis, $panel, bool $force = false): string
     {
         $fieldName = $field['name'];
         $component = $field['component'];
@@ -210,7 +215,7 @@ class ResourceModifier
         return $content;
     }
 
-    protected function modifyDefaultValue(string $content, array $field, array $analysis, $panel): string
+    protected function modifyDefaultValue(string $content, array $field, array $analysis, $panel, bool $force = false): string
     {
         $fieldName = $field['name'];
         $component = $field['component'];
@@ -232,7 +237,7 @@ class ResourceModifier
         return $content;
     }
 
-    protected function modifyColumns(string $content, array $columns, array $analysis, $panel): string
+    protected function modifyColumns(string $content, array $columns, array $analysis, $panel, bool $force = false): string
     {
         foreach ($columns as $column) {
             // Skip if preserve existing labels is enabled and column has a label
@@ -276,7 +281,7 @@ class ResourceModifier
         return $content;
     }
 
-    protected function modifyActions(string $content, array $actions, array $analysis, $panel): string
+    protected function modifyActions(string $content, array $actions, array $analysis, $panel, bool $force = false): string
     {
         foreach ($actions as $action) {
             // Skip if preserve existing labels is enabled and action has a label
@@ -319,7 +324,7 @@ class ResourceModifier
         return $content;
     }
 
-    protected function modifySections(string $content, array $sections, array $analysis, $panel): string
+    protected function modifySections(string $content, array $sections, array $analysis, $panel, bool $force = false): string
     {
         // Group sections by their original key to handle duplicates properly
         $sectionsByOriginalKey = [];
@@ -366,7 +371,7 @@ class ResourceModifier
         return $content;
     }
 
-    protected function modifyFilters(string $content, array $filters, array $analysis, $panel): string
+    protected function modifyFilters(string $content, array $filters, array $analysis, $panel, bool $force = false): string
     {
         foreach ($filters as $filter) {
             // Skip if preserve existing labels is enabled and filter has a label
@@ -426,7 +431,7 @@ class ResourceModifier
         File::copy($filePath, $backupPath);
     }
 
-    protected function modifySchemaFiles(array $schemaFileFields, array $schemaFileColumns, array $analysis, $panel): void
+    protected function modifySchemaFiles(array $schemaFileFields, array $schemaFileColumns, array $analysis, $panel, bool $force = false): void
     {
         // Get all unique schema files
         $schemaFiles = array_unique(array_merge(
@@ -449,12 +454,12 @@ class ResourceModifier
 
             // Modify fields in this schema file
             if (isset($schemaFileFields[$schemaFilePath])) {
-                $content = $this->modifyFields($content, $schemaFileFields[$schemaFilePath], $analysis, $panel);
+                $content = $this->modifyFields($content, $schemaFileFields[$schemaFilePath], $analysis, $panel, $force);
             }
 
             // Modify columns in this schema file
             if (isset($schemaFileColumns[$schemaFilePath])) {
-                $content = $this->modifyColumns($content, $schemaFileColumns[$schemaFilePath], $analysis, $panel);
+                $content = $this->modifyColumns($content, $schemaFileColumns[$schemaFilePath], $analysis, $panel, $force);
             }
 
             // Only write if content changed
@@ -492,8 +497,8 @@ class ResourceModifier
 
             $labelsToAdd = [];
 
-            // Always add/update navigation label if it has hardcoded values or doesn't exist
-            if (! $hasNavigationLabel || $hasHardcodedNavigationLabel) {
+            // Add/update navigation label if it has hardcoded values or doesn't exist, or if force mode is enabled
+            if (! $hasNavigationLabel || $hasHardcodedNavigationLabel || $force) {
                 if ($hasNavigationLabel) {
                     // Remove existing navigation label first (whether hardcoded or null)
                     $content = preg_replace('/protected\s+static\s+\?string\s+\$navigationLabel\s*=\s*[^;]+;\s*/', '', $content);
@@ -501,8 +506,8 @@ class ResourceModifier
                 $labelsToAdd[] = "\n\n    protected static ?string \$navigationLabel = null;";
             }
 
-            // Always add/update model label if it has hardcoded values or doesn't exist
-            if (! $hasModelLabel || $hasHardcodedModelLabel) {
+            // Add/update model label if it has hardcoded values or doesn't exist, or if force mode is enabled
+            if (! $hasModelLabel || $hasHardcodedModelLabel || $force) {
                 if ($hasModelLabel) {
                     // Remove existing model label first (whether hardcoded or null)
                     $content = preg_replace('/protected\s+static\s+\?string\s+\$modelLabel\s*=\s*[^;]+;\s*/', '', $content);
@@ -510,8 +515,8 @@ class ResourceModifier
                 $labelsToAdd[] = "\n\n    protected static ?string \$modelLabel = null;";
             }
 
-            // Always add/update plural model label if it has hardcoded values or doesn't exist
-            if (! $hasPluralModelLabel || $hasHardcodedPluralModelLabel) {
+            // Add/update plural model label if it has hardcoded values or doesn't exist, or if force mode is enabled
+            if (! $hasPluralModelLabel || $hasHardcodedPluralModelLabel || $force) {
                 if ($hasPluralModelLabel) {
                     // Remove existing plural model label first (whether hardcoded or null)
                     $content = preg_replace('/protected\s+static\s+\?string\s+\$pluralModelLabel\s*=\s*[^;]+;\s*/', '', $content);
@@ -525,7 +530,7 @@ class ResourceModifier
         }
 
         // Now handle the getter methods - always update them if we're localizing
-        $content = $this->updateResourceMethods($content, $navigationLabelKey, $modelLabelKey, $pluralModelLabelKey, true);
+        $content = $this->updateResourceMethods($content, $navigationLabelKey, $modelLabelKey, $pluralModelLabelKey, $force);
 
         return $content;
     }
@@ -551,8 +556,10 @@ class ResourceModifier
         $newMethod = "    public static function {$methodName}(): string\n    {\n        return __('{$translationKey}');\n    }";
 
         if (preg_match($methodPattern, $content)) {
-            // Always replace existing method when localizing to ensure correct translation keys
-            $content = preg_replace($methodPattern, $newMethod, $content);
+            // Replace existing method when force is enabled or when method doesn't already use translations
+            if ($force || ! preg_match('/function\s+'.$methodName.'\s*\([^)]*\)\s*:\s*string\s*\{[^}]*__\s*\(/s', $content)) {
+                $content = preg_replace($methodPattern, $newMethod, $content);
+            }
         } else {
             // Method doesn't exist, add it before the closing brace
             $pattern = '/(\n\s*}\s*)$/';
@@ -560,6 +567,31 @@ class ResourceModifier
                 $insertPosition = $matches[0][1];
                 $content = substr_replace($content, "\n".$newMethod."\n", $insertPosition, 0);
             }
+        }
+
+        return $content;
+    }
+
+    protected function updateTranslationKeysToCorrectPanel(string $content, array $analysis, $panel): string
+    {
+        $resourceName = Str::snake($analysis['resource_name']);
+        $currentPanelId = $panel->getId();
+        $prefix = config('filament-localization.translation_key_prefix', 'filament');
+
+        // Look for translation keys that reference other panels
+        $possiblePanels = config('filament-localization.other_panel_ids', ['admin', 'Admin']);
+
+        foreach ($possiblePanels as $otherPanel) {
+            if (strtolower($otherPanel) === strtolower($currentPanelId)) {
+                continue; // Skip current panel
+            }
+
+            // Pattern to match translation keys with other panel references
+            // This pattern matches __('filament/other_panel/...')
+            $pattern = "/__\(['\"]".preg_quote($prefix, '/')."\/(?i:".preg_quote($otherPanel, '/').")\/([^'\"]+)['\"]\)/";
+            $replacement = "__('$prefix/$currentPanelId/\$1')";
+
+            $content = preg_replace($pattern, $replacement, $content);
         }
 
         return $content;

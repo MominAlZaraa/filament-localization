@@ -15,7 +15,7 @@ class PageModifier
         $this->statistics = $statistics ?? app(StatisticsService::class);
     }
 
-    public function modify(string $pageClass, array $analysis, $panel): void
+    public function modify(string $pageClass, array $analysis, $panel, bool $force = false): void
     {
         $filePath = $analysis['file_path'];
 
@@ -32,21 +32,26 @@ class PageModifier
         $originalContent = $content;
 
         // Modify infolist entries
-        $content = $this->modifyInfolistEntries($content, $analysis['infolist_entries'], $analysis, $panel);
+        $content = $this->modifyInfolistEntries($content, $analysis['infolist_entries'], $analysis, $panel, $force);
 
         // Modify actions
-        $content = $this->modifyActions($content, $analysis['actions'], $analysis, $panel);
+        $content = $this->modifyActions($content, $analysis['actions'], $analysis, $panel, $force);
 
         // Modify sections
-        $content = $this->modifySections($content, $analysis['sections'], $analysis, $panel);
+        $content = $this->modifySections($content, $analysis['sections'], $analysis, $panel, $force);
 
         // Modify custom content
-        $content = $this->modifyCustomContent($content, $analysis['custom_content'], $analysis, $panel);
+        $content = $this->modifyCustomContent($content, $analysis['custom_content'], $analysis, $panel, $force);
 
         // Modify labels, navigation, and titles
-        $content = $this->modifyLabels($content, $analysis['labels'], $analysis, $panel);
-        $content = $this->modifyNavigation($content, $analysis['navigation'], $analysis, $panel);
-        $content = $this->modifyTitles($content, $analysis['titles'], $analysis, $panel);
+        $content = $this->modifyLabels($content, $analysis['labels'], $analysis, $panel, $force);
+        $content = $this->modifyNavigation($content, $analysis['navigation'], $analysis, $panel, $force);
+        $content = $this->modifyTitles($content, $analysis['titles'], $analysis, $panel, $force);
+
+        // In force mode, update existing translation keys to use correct panel reference
+        if ($force) {
+            $content = $this->updateTranslationKeysToCorrectPanel($content, $analysis, $panel);
+        }
 
         // Add missing label methods if needed
         $content = $this->addMissingLabelMethods($content, $analysis, $panel);
@@ -58,11 +63,11 @@ class PageModifier
         }
     }
 
-    protected function modifyInfolistEntries(string $content, array $entries, array $analysis, $panel): string
+    protected function modifyInfolistEntries(string $content, array $entries, array $analysis, $panel, bool $force = false): string
     {
         foreach ($entries as $entry) {
-            // Skip if preserve existing labels is enabled and entry has a label
-            if ($entry['has_label'] && config('filament-localization.preserve_existing_labels', false)) {
+            // Skip if preserve existing labels is enabled and entry has a label (unless force mode)
+            if ($entry['has_label'] && config('filament-localization.preserve_existing_labels', false) && ! $force) {
                 continue;
             }
 
@@ -104,11 +109,11 @@ class PageModifier
         return $content;
     }
 
-    protected function modifyActions(string $content, array $actions, array $analysis, $panel): string
+    protected function modifyActions(string $content, array $actions, array $analysis, $panel, bool $force = false): string
     {
         foreach ($actions as $action) {
-            // Skip if preserve existing labels is enabled and action has a label
-            if ($action['has_label'] && config('filament-localization.preserve_existing_labels', false)) {
+            // Skip if preserve existing labels is enabled and action has a label (unless force mode)
+            if ($action['has_label'] && config('filament-localization.preserve_existing_labels', false) && ! $force) {
                 continue;
             }
 
@@ -148,7 +153,7 @@ class PageModifier
         return $content;
     }
 
-    protected function modifySections(string $content, array $sections, array $analysis, $panel): string
+    protected function modifySections(string $content, array $sections, array $analysis, $panel, bool $force = false): string
     {
         foreach ($sections as $section) {
             $component = $section['component'];
@@ -165,7 +170,7 @@ class PageModifier
         return $content;
     }
 
-    protected function modifyCustomContent(string $content, array $customContent, array $analysis, $panel): string
+    protected function modifyCustomContent(string $content, array $customContent, array $analysis, $panel, bool $force = false): string
     {
         foreach ($customContent as $item) {
             $translationKey = $this->buildTranslationKey($analysis, $panel, $item['translation_key']);
@@ -194,10 +199,11 @@ class PageModifier
         };
     }
 
-    protected function modifyLabels(string $content, array $labels, array $analysis, $panel): string
+    protected function modifyLabels(string $content, array $labels, array $analysis, $panel, bool $force = false): string
     {
         foreach ($labels as $label) {
-            if ($label['has_translation']) {
+            // In force mode, always update translations even if they already exist
+            if ($label['has_translation'] && ! $force) {
                 continue; // Already has translation
             }
 
@@ -214,10 +220,11 @@ class PageModifier
         return $content;
     }
 
-    protected function modifyNavigation(string $content, array $navigation, array $analysis, $panel): string
+    protected function modifyNavigation(string $content, array $navigation, array $analysis, $panel, bool $force = false): string
     {
         foreach ($navigation as $nav) {
-            if ($nav['has_translation']) {
+            // In force mode, always update translations even if they already exist
+            if ($nav['has_translation'] && ! $force) {
                 continue; // Already has translation
             }
 
@@ -234,10 +241,11 @@ class PageModifier
         return $content;
     }
 
-    protected function modifyTitles(string $content, array $titles, array $analysis, $panel): string
+    protected function modifyTitles(string $content, array $titles, array $analysis, $panel, bool $force = false): string
     {
         foreach ($titles as $title) {
-            if ($title['has_translation']) {
+            // In force mode, always update translations even if they already exist
+            if ($title['has_translation'] && ! $force) {
                 continue; // Already has translation
             }
 
@@ -263,16 +271,36 @@ class PageModifier
     protected function addMissingLabelMethods(string $content, array $analysis, $panel): string
     {
         $pageName = $analysis['page_name'];
-        $translationKey = $this->buildTranslationKey($analysis, $panel, 'title');
+        $titleTranslationKey = $this->buildTranslationKey($analysis, $panel, 'title');
 
-        // Check if getTitle method exists (non-static for pages)
-        if (! preg_match('/public\s+function\s+getTitle\s*\(/', $content)) {
-            // Add getTitle method before the closing brace
+        // For navigation label, use title as fallback if navigation_label doesn't exist
+        // This matches Filament's behavior where navigation label falls back to title
+        $navigationTranslationKey = $this->buildTranslationKey($analysis, $panel, 'title');
+
+        $methodsToAdd = '';
+
+        // Check if this is a Filament Page class
+        $isPageClass = ($analysis['is_page'] ?? false) === true;
+
+        // For Page classes, always add the methods if they don't exist
+        if ($isPageClass) {
+            // Check if getTitle method exists
+            if (! preg_match('/public\s+(?:static\s+)?function\s+getTitle\s*\(/', $content)) {
+                $methodsToAdd .= "\n    public function getTitle(): string\n    {\n        return __('{$titleTranslationKey}');\n    }";
+            }
+
+            // Check if getNavigationLabel method exists - static for proper Filament convention
+            if (! preg_match('/public\s+(?:static\s+)?function\s+getNavigationLabel\s*\(/', $content)) {
+                $methodsToAdd .= "\n\n    public static function getNavigationLabel(): string\n    {\n        return __('{$navigationTranslationKey}');\n    }";
+            }
+        }
+
+        // If there are methods to add, add them before the closing brace
+        if (! empty($methodsToAdd)) {
             $pattern = '/(\n\s*}\s*)$/';
             if (preg_match($pattern, $content, $matches, PREG_OFFSET_CAPTURE)) {
                 $insertPosition = $matches[0][1];
-                $method = "\n    public function getTitle(): string\n    {\n        return __('$translationKey');\n    }\n";
-                $content = substr_replace($content, $method, $insertPosition, 0);
+                $content = substr_replace($content, $methodsToAdd."\n", $insertPosition, 0);
             }
         }
 
@@ -301,6 +329,31 @@ class PageModifier
             $insertPosition = $matches[0][1];
             $method = "\n    public {$staticKeyword}function {$methodName}(): string\n    {\n        return __('{$translationKey}');\n    }\n";
             $content = substr_replace($content, $method, $insertPosition, 0);
+        }
+
+        return $content;
+    }
+
+    protected function updateTranslationKeysToCorrectPanel(string $content, array $analysis, $panel): string
+    {
+        $pageName = Str::snake($analysis['page_name']);
+        $currentPanelId = $panel->getId();
+        $prefix = config('filament-localization.translation_key_prefix', 'filament');
+
+        // Look for translation keys that reference other panels
+        $possiblePanels = config('filament-localization.other_panel_ids', ['admin', 'Admin']);
+
+        foreach ($possiblePanels as $otherPanel) {
+            if (strtolower($otherPanel) === strtolower($currentPanelId)) {
+                continue; // Skip current panel
+            }
+
+            // Pattern to match translation keys with other panel references
+            // This pattern matches __('filament/other_panel/...')
+            $pattern = "/__\(['\"]".preg_quote($prefix, '/')."\/(?i:".preg_quote($otherPanel, '/').")\/([^'\"]+)['\"]\)/";
+            $replacement = "__('$prefix/$currentPanelId/$1')";
+
+            $content = preg_replace($pattern, $replacement, $content);
         }
 
         return $content;

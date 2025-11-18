@@ -61,7 +61,7 @@ class RelationManagerAnalyzer
         'Group',
     ];
 
-    public function analyze(string $relationManagerClass, $panel): array
+    public function analyze(string $relationManagerClass, $panel, bool $force = false): array
     {
         $reflection = new ReflectionClass($relationManagerClass);
         $filePath = $reflection->getFileName();
@@ -91,7 +91,8 @@ class RelationManagerAnalyzer
         // Check if this relation manager has custom content that needs localization
         $analysis['has_custom_content'] = $this->hasCustomContent($content);
 
-        if (! $analysis['has_custom_content']) {
+        // If no custom content and not in force mode, return early
+        if (! $analysis['has_custom_content'] && ! $force) {
             return $analysis;
         }
 

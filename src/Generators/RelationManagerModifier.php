@@ -15,7 +15,7 @@ class RelationManagerModifier
         $this->statistics = $statistics ?? app(StatisticsService::class);
     }
 
-    public function modify(string $relationManagerClass, array $analysis, $panel): void
+    public function modify(string $relationManagerClass, array $analysis, $panel, bool $force = false): void
     {
         $filePath = $analysis['file_path'];
 
@@ -32,27 +32,32 @@ class RelationManagerModifier
         $originalContent = $content;
 
         // Modify form fields
-        $content = $this->modifyFields($content, $analysis['fields'], $analysis, $panel);
+        $content = $this->modifyFields($content, $analysis['fields'], $analysis, $panel, $force);
 
         // Modify table columns
-        $content = $this->modifyColumns($content, $analysis['columns'], $analysis, $panel);
+        $content = $this->modifyColumns($content, $analysis['columns'], $analysis, $panel, $force);
 
         // Modify actions
-        $content = $this->modifyActions($content, $analysis['actions'], $analysis, $panel);
+        $content = $this->modifyActions($content, $analysis['actions'], $analysis, $panel, $force);
 
         // Modify sections
-        $content = $this->modifySections($content, $analysis['sections'], $analysis, $panel);
+        $content = $this->modifySections($content, $analysis['sections'], $analysis, $panel, $force);
 
         // Modify filters
-        $content = $this->modifyFilters($content, $analysis['filters'], $analysis, $panel);
+        $content = $this->modifyFilters($content, $analysis['filters'], $analysis, $panel, $force);
 
         // Modify labels, navigation, and titles
-        $content = $this->modifyLabels($content, $analysis['labels'], $analysis, $panel);
-        $content = $this->modifyNavigation($content, $analysis['navigation'], $analysis, $panel);
-        $content = $this->modifyTitles($content, $analysis['titles'], $analysis, $panel);
+        $content = $this->modifyLabels($content, $analysis['labels'], $analysis, $panel, $force);
+        $content = $this->modifyNavigation($content, $analysis['navigation'], $analysis, $panel, $force);
+        $content = $this->modifyTitles($content, $analysis['titles'], $analysis, $panel, $force);
 
         // Add missing label methods if needed
         $content = $this->addMissingLabelMethods($content, $analysis, $panel);
+
+        // If force mode is enabled, update any existing translation keys to use the correct panel
+        if ($force) {
+            $content = $this->updateTranslationKeysToCorrectPanel($content, $panel, $analysis);
+        }
 
         // Only write if content changed
         if ($content !== $originalContent) {
@@ -61,7 +66,7 @@ class RelationManagerModifier
         }
     }
 
-    protected function modifyFields(string $content, array $fields, array $analysis, $panel): string
+    protected function modifyFields(string $content, array $fields, array $analysis, $panel, bool $force = false): string
     {
         foreach ($fields as $field) {
             // Skip if preserve existing labels is enabled and field has a label
@@ -107,7 +112,7 @@ class RelationManagerModifier
         return $content;
     }
 
-    protected function modifyColumns(string $content, array $columns, array $analysis, $panel): string
+    protected function modifyColumns(string $content, array $columns, array $analysis, $panel, bool $force = false): string
     {
         foreach ($columns as $column) {
             // Skip if preserve existing labels is enabled and column has a label
@@ -151,7 +156,7 @@ class RelationManagerModifier
         return $content;
     }
 
-    protected function modifyActions(string $content, array $actions, array $analysis, $panel): string
+    protected function modifyActions(string $content, array $actions, array $analysis, $panel, bool $force = false): string
     {
         foreach ($actions as $action) {
             // Skip if preserve existing labels is enabled and action has a label
@@ -195,7 +200,7 @@ class RelationManagerModifier
         return $content;
     }
 
-    protected function modifySections(string $content, array $sections, array $analysis, $panel): string
+    protected function modifySections(string $content, array $sections, array $analysis, $panel, bool $force = false): string
     {
         foreach ($sections as $section) {
             $component = $section['component'];
@@ -212,7 +217,7 @@ class RelationManagerModifier
         return $content;
     }
 
-    protected function modifyFilters(string $content, array $filters, array $analysis, $panel): string
+    protected function modifyFilters(string $content, array $filters, array $analysis, $panel, bool $force = false): string
     {
         foreach ($filters as $filter) {
             // Skip if preserve existing labels is enabled and filter has a label
@@ -253,6 +258,30 @@ class RelationManagerModifier
         return $content;
     }
 
+    protected function updateTranslationKeysToCorrectPanel(string $content, $panel, array $analysis): string
+    {
+        $currentPanelId = $panel->getId();
+        $prefix = config('filament-localization.translation_key_prefix', 'filament');
+
+        // Look for translation keys that reference other panels
+        $possiblePanels = config('filament-localization.other_panel_ids', ['admin', 'Admin']);
+
+        foreach ($possiblePanels as $otherPanel) {
+            if (strtolower($otherPanel) === strtolower($currentPanelId)) {
+                continue; // Skip current panel
+            }
+
+            // Pattern to match translation keys with other panel references
+            // This pattern matches __('filament/other_panel/...')
+            $pattern = "/__\(['\"]".preg_quote($prefix, '/')."\/(?i:".preg_quote($otherPanel, '/').")\/([^'\"]+)['\"]\)/";
+            $replacement = "__('$prefix/$currentPanelId/\$1')";
+
+            $content = preg_replace($pattern, $replacement, $content);
+        }
+
+        return $content;
+    }
+
     protected function buildTranslationKey(array $analysis, $panel, string $key): string
     {
         $prefix = config('filament-localization.translation_key_prefix', 'filament');
@@ -266,10 +295,10 @@ class RelationManagerModifier
         };
     }
 
-    protected function modifyLabels(string $content, array $labels, array $analysis, $panel): string
+    protected function modifyLabels(string $content, array $labels, array $analysis, $panel, bool $force = false): string
     {
         foreach ($labels as $label) {
-            if ($label['has_translation']) {
+            if ($label['has_translation'] && ! $force) {
                 continue; // Already has translation
             }
 
@@ -286,10 +315,10 @@ class RelationManagerModifier
         return $content;
     }
 
-    protected function modifyNavigation(string $content, array $navigation, array $analysis, $panel): string
+    protected function modifyNavigation(string $content, array $navigation, array $analysis, $panel, bool $force = false): string
     {
         foreach ($navigation as $nav) {
-            if ($nav['has_translation']) {
+            if ($nav['has_translation'] && ! $force) {
                 continue; // Already has translation
             }
 
@@ -306,10 +335,10 @@ class RelationManagerModifier
         return $content;
     }
 
-    protected function modifyTitles(string $content, array $titles, array $analysis, $panel): string
+    protected function modifyTitles(string $content, array $titles, array $analysis, $panel, bool $force = false): string
     {
         foreach ($titles as $title) {
-            if ($title['has_translation']) {
+            if ($title['has_translation'] && ! $force) {
                 continue; // Already has translation
             }
 

@@ -276,7 +276,8 @@ class LocalizeFilamentCommand extends Command
                     $page,
                     $panel,
                     $locales,
-                    $this->option('dry-run')
+                    $this->option('dry-run'),
+                    $this->option('force')
                 );
 
                 $progressBar->advance();
@@ -294,7 +295,8 @@ class LocalizeFilamentCommand extends Command
                 $page,
                 $panel,
                 $locales,
-                $this->option('dry-run')
+                $this->option('dry-run'),
+                $this->option('force')
             );
 
             $progressBar->advance();
@@ -324,7 +326,8 @@ class LocalizeFilamentCommand extends Command
                 $relationManager,
                 $panel,
                 $locales,
-                $this->option('dry-run')
+                $this->option('dry-run'),
+                $this->option('force')
             );
 
             $progressBar->advance();
@@ -731,6 +734,11 @@ class LocalizeFilamentCommand extends Command
                 '/public\s+(?:static\s+)?function\s+getHeading\s*\([^)]*\)\s*:\s*[^{]*{[^}]*return\s+[\'"][^\'"]+[\'"]/',
                 '/public\s+(?:static\s+)?function\s+getSubheading\s*\([^)]*\)\s*:\s*[^{]*{[^}]*return\s+[\'"][^\'"]+[\'"]/',
                 '/public\s+(?:static\s+)?function\s+getNavigationLabel\s*\([^)]*\)\s*:\s*[^{]*{[^}]*return\s+[\'"][^\'"]+[\'"]/',
+
+                // Translation function calls
+                '/__\([\'"][^\'"]+[\'"]\)/',
+                '/trans\([\'"][^\'"]+[\'"]\)/',
+                '/@lang\([\'"][^\'"]+[\'"]\)/',
             ];
 
             foreach ($patterns as $pattern) {
