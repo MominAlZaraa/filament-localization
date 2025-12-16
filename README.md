@@ -80,7 +80,7 @@ The configuration file `config/filament-localization.php` provides customization
 ```php
 return [
     'default_locale' => 'en',
-    'locales' => ['en', 'es', 'fr'],
+    'locales' => ['en', 'el', 'fr'],
     'structure' => 'panel-based', // flat, nested, or panel-based
     'backup' => true,
     'git' => [
@@ -126,7 +126,7 @@ Scans and localizes Filament resources with structured translation files.
 php artisan filament:localize
 
 # Specific panels and locales
-php artisan filament:localize --panel=admin --locale=en --locale=es
+php artisan filament:localize --panel=admin --locale=en --locale=el
 
 # Preview changes
 php artisan filament:localize --dry-run
@@ -155,7 +155,7 @@ Intelligently translates Filament resources using the DeepL API with smart detec
 
 ```bash
 # Smart translation - detects untranslated content automatically
-php artisan filament:translate-with-deepl --source-lang=en --target-lang=es --panel=admin
+php artisan filament:translate-with-deepl --source-lang=en --target-lang=el --panel=admin
 
 # Force mode - overwrites all existing translations
 php artisan filament:translate-with-deepl --source-lang=en --target-lang=fr --panel=admin --force
@@ -177,7 +177,7 @@ php artisan filament:translate-with-deepl --source-lang=en --target-lang=de --pa
 - `--force` - Force translation and overwrite all existing translations
 - `--dry-run` - Preview changes without applying them
 
-**Supported Languages:** 40+ languages including English, Spanish, French, German, Italian, Portuguese, Russian, Japanese, Chinese, Arabic, and more.
+**Supported Languages:** 40+ languages including English, Greek, French, German, Italian, Portuguese, Russian, Japanese, Chinese, Arabic, and more.
 
 ## Quick Start
 
@@ -188,7 +188,7 @@ php artisan filament:translate-with-deepl --source-lang=en --target-lang=de --pa
 
 2. **Translate with DeepL (optional):**
    ```bash
-   php artisan filament:translate-with-deepl --source-lang=en --target-lang=es --panel=admin
+   php artisan filament:translate-with-deepl --source-lang=en --target-lang=el --panel=admin
    ```
 
 3. **Install language switcher:**
@@ -201,7 +201,7 @@ php artisan filament:translate-with-deepl --source-lang=en --target-lang=de --pa
    FilamentLanguageSwitcherPlugin::make()
        ->locales([
            ['code' => 'en', 'name' => 'English', 'flag' => 'gb'],
-           ['code' => 'es', 'name' => 'Spanish', 'flag' => 'es'],
+           ['code' => 'el', 'name' => 'Greek', 'flag' => 'gr'],
        ])
    ```
 
@@ -214,7 +214,7 @@ The package creates organized translation files based on your configuration:
 lang/
 ├── en/filament/admin/user_resource.php
 ├── en/filament/blog/post_resource.php
-└── es/filament/admin/user_resource.php
+└── el/filament/admin/user_resource.php
 ```
 
 **Other Structures:** Nested or flat structures available via configuration.
@@ -312,18 +312,18 @@ return [
     'description' => 'Manage your blog posts and comments',
 ];
 
-// Target (Spanish) - Before Translation
+// Target (Greek) - Before Translation
 return [
     'title' => 'Blog Dashboard',           // ← Will be translated (identical to source)
     'navigation_label' => 'Send Email',    // ← Will be translated (not in skip terms)
-    'description' => 'Gestiona tus publicaciones', // ← Will be preserved (properly translated)
+    'description' => 'Διαχείριση των δημοσιεύσεων σας', // ← Will be preserved (properly translated)
 ];
 
-// Target (Spanish) - After Translation
+// Target (Greek) - After Translation
 return [
-    'title' => 'Panel de Blog',            // ← Translated
-    'navigation_label' => 'Enviar Email',  // ← Translated
-    'description' => 'Gestiona tus publicaciones', // ← Preserved
+    'title' => 'Πίνακας Ελέγχου Ιστολογίου',            // ← Translated
+    'navigation_label' => 'Αποστολή Email',  // ← Translated
+    'description' => 'Διαχείριση των δημοσιεύσεων σας', // ← Preserved
 ];
 ```
 
@@ -348,7 +348,7 @@ public function panel(Panel $panel): Panel
             FilamentLanguageSwitcherPlugin::make()
                 ->locales([
                     ['code' => 'en', 'name' => 'English', 'flag' => 'gb'],
-                    ['code' => 'es', 'name' => 'Spanish', 'flag' => 'es'],
+                    ['code' => 'el', 'name' => 'Greek', 'flag' => 'gr'],
                 ]),
         ]);
 }
@@ -376,10 +376,10 @@ The Filament admin interface displays in English with hardcoded labels:
 The same interface now supports multiple languages with proper translation keys:
 
 ![After Localization - Users List](photos/after.png)
-*Users list page with localized Spanish labels*
+*Users list page with localized Greek labels*
 
 ![After Localization - User Edit Form](photos/after-2.png)
-*User edit form with localized Spanish field labels*
+*User edit form with localized Greek field labels*
 
 ![After Localization - File Structure](photos/after-3.png)
 *File structure showing organized translation files for multiple locales*
@@ -413,8 +413,8 @@ Action::make('delete')
 // lang/en/filament/admin/user_resource.php
 return ['name' => 'Name', 'email' => 'Email', 'delete' => 'Delete'];
 
-// lang/es/filament/admin/user_resource.php  
-return ['name' => 'Nombre', 'email' => 'Email', 'delete' => 'Eliminar'];
+// lang/el/filament/admin/user_resource.php  
+return ['name' => 'Όνομα', 'email' => 'Email', 'delete' => 'Διαγραφή'];
 ```
 
 ## Safety Features
