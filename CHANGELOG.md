@@ -2,6 +2,27 @@
 
 All notable changes to `filament-localization` will be documented in this file.
 
+## v2.0.0 - 2026-01-30
+
+### Added
+
+- **PHP 8.5** — Composer allows PHP `^8.3|^8.4|^8.5`. v2.x supports PHP 8.3, 8.4, and 8.5 only.
+- **Filament 5 & Livewire 4** — Full compatibility with Filament v5.x (Livewire v4.x, Tailwind v4.x). All analyzers and modifiers work with Filament 5's structure (Forms, Tables, Infolists, Actions, Schemas).
+- **README** — Version support table; "Supported" and "Deprecated" lines aligned with filament-team-guard style.
+
+### Changed (Breaking)
+
+- **Filament** — Requirement `^4.0` → `^5.0`. v2.x is Filament 5 only; use [v1.x](https://github.com/MominAlZaraa/filament-localization/releases) for Filament 4.
+- **PHP** — Requirement `^8.2|^8.3|^8.4` → `^8.3|^8.4|^8.5`. PHP 8.2 is no longer supported in v2.x.
+- **CI** — GitHub Actions test matrix updated to PHP 8.3, 8.4, and 8.5 (8.2 removed).
+
+### Compatibility
+
+- **Supported**: PHP ^8.3–^8.5, Laravel ^12.0, Filament ^5.0, Livewire ^4.0.
+- **Deprecated (use v1.x)**: PHP &lt;8.3, Filament v4, Livewire v3.
+
+---
+
 ## v1.0.3 - 2025-11-18
 
 ### Major Features

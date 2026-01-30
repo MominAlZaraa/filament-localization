@@ -14,9 +14,11 @@
 
 **This is the original and only package that provides automatic localization with translation features for Filament.**
 
-**Requirements**: PHP ^8.2|^8.3|^8.4 | Laravel ^12.0 | Filament ^4.0
+**Requirements**: PHP ^8.3 | ^8.4 | ^8.5 · Laravel ^12.0 · Filament ^5.0 (Livewire ^4.0, Tailwind ^4.0)
 
-> **🆕 Latest Updates**: Enhanced DeepL integration with smart translation detection, page localization support, and intelligent skip terms configuration.
+**Supported**: PHP ^8.3–^8.5, Laravel ^12.0, Filament ^5.0, Livewire ^4.0 · **Deprecated**: PHP &lt;8.3, Filament v4 (use [v1.x](https://github.com/MominAlZaraa/filament-localization/releases)), Livewire v3.
+
+> **🆕 Latest Updates**: v2.x — Filament 5 & Livewire 4 support; PHP 8.5; enhanced DeepL integration, page localization, and skip terms.
 
 ## Features
 
