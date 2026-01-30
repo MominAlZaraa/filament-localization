@@ -72,7 +72,7 @@ Creates:
 ```
 lang/
 ├── en/filament/user_resource.php
-├── en/filament/patient_resource.php
+├── en/filament/product_resource.php
 └── ...
 ```
 

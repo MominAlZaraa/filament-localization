@@ -101,6 +101,22 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Other Panel IDs (for translation key rewriting)
+    |--------------------------------------------------------------------------
+    |
+    | When rewriting translation keys that reference another panel, these
+    | panel IDs are matched so they can be replaced with the current panel.
+    | Add your app's panel IDs here if you use multiple Filament panels.
+    |
+    */
+
+    'other_panel_ids' => [
+        'admin',
+        'Admin',
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
     | Excluded Resources
     |--------------------------------------------------------------------------
     |

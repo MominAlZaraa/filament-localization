@@ -683,7 +683,7 @@ class ResourceAnalyzer
     protected function extractTitleFromTranslationKey(string $translationKey): string
     {
         // Extract the last part of the translation key for display
-        // e.g., 'filament/doctor.details' -> 'details'
+        // e.g., 'filament/admin.details' -> 'details'
         $parts = explode('.', $translationKey);
         $lastPart = end($parts);
 
