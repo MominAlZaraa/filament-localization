@@ -2,6 +2,7 @@
 
 namespace MominAlZaraa\FilamentLocalization\Analyzers;
 
+use Filament\Pages\Page;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Str;
 use ReflectionClass;
@@ -50,7 +51,7 @@ class PageAnalyzer
         // Check if this is a Page class by namespace or extends Page
         $isPage = str_contains($pageClass, '\\Pages\\') ||
             preg_match('/class\s+\w+\s+extends\s+[\\\\]?Page\b/', $content) ||
-            is_subclass_of($pageClass, \Filament\Pages\Page::class);
+            is_subclass_of($pageClass, Page::class);
 
         $analysis = [
             'page_class' => $pageClass,

@@ -2,6 +2,15 @@
 
 namespace MominAlZaraa\FilamentLocalization\Tests;
 
+use Filament\Actions\ActionsServiceProvider;
+use Filament\FilamentServiceProvider;
+use Filament\Forms\FormsServiceProvider;
+use Filament\Infolists\InfolistsServiceProvider;
+use Filament\Notifications\NotificationsServiceProvider;
+use Filament\Support\SupportServiceProvider;
+use Filament\Tables\TablesServiceProvider;
+use Filament\Widgets\WidgetsServiceProvider;
+use Livewire\LivewireServiceProvider;
 use MominAlZaraa\FilamentLocalization\FilamentLocalizationServiceProvider;
 use Orchestra\Testbench\TestCase as Orchestra;
 
@@ -11,15 +20,15 @@ class TestCase extends Orchestra
     {
         return [
             FilamentLocalizationServiceProvider::class,
-            \Livewire\LivewireServiceProvider::class,
-            \Filament\FilamentServiceProvider::class,
-            \Filament\Forms\FormsServiceProvider::class,
-            \Filament\Tables\TablesServiceProvider::class,
-            \Filament\Actions\ActionsServiceProvider::class,
-            \Filament\Infolists\InfolistsServiceProvider::class,
-            \Filament\Notifications\NotificationsServiceProvider::class,
-            \Filament\Support\SupportServiceProvider::class,
-            \Filament\Widgets\WidgetsServiceProvider::class,
+            LivewireServiceProvider::class,
+            FilamentServiceProvider::class,
+            FormsServiceProvider::class,
+            TablesServiceProvider::class,
+            ActionsServiceProvider::class,
+            InfolistsServiceProvider::class,
+            NotificationsServiceProvider::class,
+            SupportServiceProvider::class,
+            WidgetsServiceProvider::class,
         ];
     }
 

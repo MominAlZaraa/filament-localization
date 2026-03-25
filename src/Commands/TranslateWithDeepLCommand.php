@@ -5,6 +5,7 @@ namespace MominAlZaraa\FilamentLocalization\Commands;
 use Filament\Facades\Filament;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\File;
+use Illuminate\Support\Str;
 use MominAlZaraa\FilamentLocalization\Services\DeepLTranslationService;
 use MominAlZaraa\FilamentLocalization\Services\StatisticsService;
 
@@ -411,9 +412,9 @@ class TranslateWithDeepLCommand extends Command
 
         return match ($structure) {
             'flat' => "{$basePath}/{$prefix}.php",
-            'nested' => "{$basePath}/{$prefix}/".\Illuminate\Support\Str::snake($resourceName).'.php',
-            'panel-based' => "{$basePath}/{$prefix}/{$panelId}/".\Illuminate\Support\Str::snake($resourceName).'.php',
-            default => "{$basePath}/{$prefix}/{$panelId}/".\Illuminate\Support\Str::snake($resourceName).'.php',
+            'nested' => "{$basePath}/{$prefix}/".Str::snake($resourceName).'.php',
+            'panel-based' => "{$basePath}/{$prefix}/{$panelId}/".Str::snake($resourceName).'.php',
+            default => "{$basePath}/{$prefix}/{$panelId}/".Str::snake($resourceName).'.php',
         };
     }
 
@@ -910,9 +911,9 @@ class TranslateWithDeepLCommand extends Command
 
         return match ($structure) {
             'flat' => "{$basePath}/{$prefix}.php",
-            'nested' => "{$basePath}/{$prefix}/".\Illuminate\Support\Str::snake($widgetName).'.php',
-            'panel-based' => "{$basePath}/{$prefix}/{$panelId}/".\Illuminate\Support\Str::snake($widgetName).'.php',
-            default => "{$basePath}/{$prefix}/{$panelId}/".\Illuminate\Support\Str::snake($widgetName).'.php',
+            'nested' => "{$basePath}/{$prefix}/".Str::snake($widgetName).'.php',
+            'panel-based' => "{$basePath}/{$prefix}/{$panelId}/".Str::snake($widgetName).'.php',
+            default => "{$basePath}/{$prefix}/{$panelId}/".Str::snake($widgetName).'.php',
         };
     }
 

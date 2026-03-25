@@ -15,11 +15,13 @@ jobs:
       matrix:
         os: [ubuntu-latest]
         php: [8.5, 8.4, 8.3]
-        laravel: [12.*]
+        laravel: [12.*, 13.*]
         stability: [prefer-stable]
         include:
           - laravel: 12.*
             testbench: 10.*
+          - laravel: 13.*
+            testbench: 11.*
 
     name: P${{ matrix.php }} - L${{ matrix.laravel }} - ${{ matrix.stability }} - ${{ matrix.os }}
 
@@ -53,6 +55,6 @@ jobs:
           DEEPL_API_KEY: ${{ secrets.DEEPL_API_KEY || 'test-key-for-analysis' }}
 
       - name: Execute tests
-        run: vendor/bin/pest --ci
+        run: vendor/bin/pest --ci --no-coverage
         env:
           DEEPL_API_KEY: ${{ secrets.DEEPL_API_KEY || 'test-key-for-tests' }}
