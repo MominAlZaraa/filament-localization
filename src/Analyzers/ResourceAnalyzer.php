@@ -83,6 +83,8 @@ class ResourceAnalyzer
             'sections' => [],
             'tabs' => [],
             'filters' => [],
+            'infolist_entries' => [],
+            'navigation_group' => null,
             'relation_managers' => [],
             'schema_files' => [], // Track separate schema files
             'static_properties' => $this->analyzeStaticProperties($content),
@@ -139,10 +141,100 @@ class ResourceAnalyzer
         // Analyze filters
         $analysis['filters'] = $this->analyzeFilters($content);
 
+        // Infolist entries live on many resources (static infolist()); scope to that method body when possible
+        $infolistBody = $this->extractInfolistMethodInnerContent($content);
+        $analysis['infolist_entries'] = $this->analyzeInfolistEntries($infolistBody ?? $content);
+
+        $analysis['navigation_group'] = $this->analyzeNavigationGroup($content);
+
         // Analyze relation managers
         $analysis['relation_managers'] = $this->analyzeRelationManagers($resourceClass);
 
         return $analysis;
+    }
+
+    /**
+     * Returns inner PHP source of the `infolist()` method (between outermost braces), or null if not found.
+     */
+    protected function extractInfolistMethodInnerContent(string $content): ?string
+    {
+        if (! preg_match('/public\s+static\s+function\s+infolist\s*\([^)]*\)\s*:\s*Schema\s*\{/s', $content, $m, PREG_OFFSET_CAPTURE)) {
+            return null;
+        }
+
+        $openBracePos = $m[0][1] + strlen($m[0][0]) - 1;
+        $depth = 0;
+        $len = strlen($content);
+
+        for ($i = $openBracePos; $i < $len; $i++) {
+            $c = $content[$i];
+            if ($c === '{') {
+                $depth++;
+            } elseif ($c === '}') {
+                $depth--;
+                if ($depth === 0) {
+                    return substr($content, $openBracePos + 1, $i - $openBracePos - 1);
+                }
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * @return array{value: string, translation_key: string, has_translation: bool}|null
+     */
+    protected function analyzeNavigationGroup(string $content): ?array
+    {
+        if (preg_match('/public\s+static\s+function\s+getNavigationGroup\s*\(/', $content)) {
+            return null;
+        }
+
+        $patterns = [
+            '/protected\s+static\s+string\s*\|\s*\\\\UnitEnum\s*\|\s*null\s+\$navigationGroup\s*=\s*[\'"]([^\'"]+)[\'"]\s*;/',
+            '/protected\s+static\s+\?string\s+\$navigationGroup\s*=\s*[\'"]([^\'"]+)[\'"]\s*;/',
+            '/protected\s+static\s+string\s+\$navigationGroup\s*=\s*[\'"]([^\'"]+)[\'"]\s*;/',
+        ];
+
+        foreach ($patterns as $pattern) {
+            if (preg_match($pattern, $content, $matches)) {
+                return [
+                    'value' => $matches[1],
+                    'translation_key' => 'navigation_group',
+                    'has_translation' => false,
+                ];
+            }
+        }
+
+        return null;
+    }
+
+    protected function analyzeInfolistEntries(string $content): array
+    {
+        $entries = [];
+
+        foreach ($this->infolistEntries as $component) {
+            $pattern = "/(?<![:\w]){$component}::make\(['\"]([^'\"]+)['\"]\)/";
+
+            preg_match_all($pattern, $content, $matches);
+
+            if (! empty($matches[1])) {
+                foreach ($matches[1] as $entryName) {
+                    $hasLabel = $this->hasLabel($content, $entryName, $component);
+                    $literalLabel = $hasLabel ? $this->extractQuotedLabelAfterMake($content, $entryName, $component) : null;
+
+                    $entries[] = [
+                        'name' => $entryName,
+                        'component' => $component,
+                        'has_label' => $hasLabel,
+                        'default_label' => $literalLabel ?? $this->generateLabel($entryName),
+                        'translation_key' => $this->generateTranslationKey($entryName),
+                    ];
+                }
+            }
+        }
+
+        return $entries;
     }
 
     protected function analyzeStaticProperties(string $content): array
@@ -389,14 +481,16 @@ class ResourceAnalyzer
                 $filePath = $reflection->getFileName();
                 $content = File::get($filePath);
 
-                // Look for relation manager references
-                preg_match_all('/([A-Za-z]+RelationManager)::class/', $content, $matches);
+                // Look for relation manager references (short or FQCN before ::class)
+                preg_match_all('/([A-Za-z0-9_\\\\]+RelationManager)::class/', $content, $matches);
 
                 if (! empty($matches[1])) {
                     foreach ($matches[1] as $relationManager) {
+                        $relationManager = ltrim($relationManager, '\\');
+                        $shortName = class_basename($relationManager);
                         $relationManagers[] = [
                             'class' => $relationManager,
-                            'name' => str_replace('RelationManager', '', $relationManager),
+                            'name' => str_replace('RelationManager', '', $shortName),
                         ];
                     }
                 }
@@ -406,6 +500,32 @@ class ResourceAnalyzer
         }
 
         return $relationManagers;
+    }
+
+    protected function extractQuotedLabelAfterMake(string $content, string $fieldName, string $component): ?string
+    {
+        $makePattern = "/{$component}::make\(['\"]".preg_quote($fieldName, '/')."['\"]\)/";
+
+        if (! preg_match($makePattern, $content, $matches, PREG_OFFSET_CAPTURE)) {
+            return null;
+        }
+
+        $startPos = $matches[0][1] + strlen($matches[0][0]);
+        $endPattern = "/\n\s*(?:\w+::make\(|[\]\}]\))/";
+
+        if (preg_match($endPattern, $content, $endMatches, PREG_OFFSET_CAPTURE, $startPos)) {
+            $endPos = $endMatches[0][1];
+        } else {
+            $endPos = strlen($content);
+        }
+
+        $fieldContent = substr($content, $startPos, $endPos - $startPos);
+
+        if (preg_match('/->label\(\s*[\'"]([^\'"]+)[\'"]\s*\)/', $fieldContent, $m)) {
+            return $m[1];
+        }
+
+        return null;
     }
 
     protected function hasLabel(string $content, string $fieldName, string $component): bool
@@ -660,7 +780,11 @@ class ResourceAnalyzer
 
     protected function generateTranslationKey(string $fieldName): string
     {
-        return Str::snake($fieldName);
+        $key = Str::snake($fieldName);
+        $key = preg_replace('/[^a-z0-9_.]+/', '_', $key);
+        $key = preg_replace('/_+/', '_', $key);
+
+        return trim($key, '_');
     }
 
     protected function generateUniqueTranslationKey(string $baseKey, array &$titleCounts): string

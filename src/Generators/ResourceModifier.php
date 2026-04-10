@@ -34,6 +34,10 @@ class ResourceModifier
         // Modify resource labels (navigation and model labels)
         $content = $this->modifyResourceLabels($content, $analysis, $panel, $force);
 
+        $content = $this->modifyNavigationGroup($content, $analysis, $panel, $force);
+
+        $content = $this->modifyInfolistInResource($content, $analysis, $panel, $force);
+
         // Group fields and columns by file
         $resourceFields = [];
         $resourceColumns = [];
@@ -84,6 +88,146 @@ class ResourceModifier
 
         // Modify schema files
         $this->modifySchemaFiles($schemaFileFields, $schemaFileColumns, $analysis, $panel, $force);
+    }
+
+    /**
+     * @return array{before: string, inner: string, after: string}|null
+     */
+    protected function sliceInfolistMethodParts(string $content): ?array
+    {
+        if (! preg_match('/public\s+static\s+function\s+infolist\s*\([^)]*\)\s*:\s*Schema\s*\{/s', $content, $m, PREG_OFFSET_CAPTURE)) {
+            return null;
+        }
+
+        $openBracePos = $m[0][1] + strlen($m[0][0]) - 1;
+        $depth = 0;
+        $len = strlen($content);
+
+        for ($i = $openBracePos; $i < $len; $i++) {
+            $c = $content[$i];
+            if ($c === '{') {
+                $depth++;
+            } elseif ($c === '}') {
+                $depth--;
+                if ($depth === 0) {
+                    $innerStart = $openBracePos + 1;
+
+                    return [
+                        'before' => substr($content, 0, $innerStart),
+                        'inner' => substr($content, $innerStart, $i - $innerStart),
+                        'after' => substr($content, $i),
+                    ];
+                }
+            }
+        }
+
+        return null;
+    }
+
+    protected function modifyInfolistInResource(string $content, array $analysis, $panel, bool $force = false): string
+    {
+        $entries = $analysis['infolist_entries'] ?? [];
+        if ($entries === []) {
+            return $content;
+        }
+
+        $parts = $this->sliceInfolistMethodParts($content);
+        if ($parts === null) {
+            return $this->modifyInfolistEntries($content, $entries, $analysis, $panel, $force);
+        }
+
+        $newInner = $this->modifyInfolistEntries($parts['inner'], $entries, $analysis, $panel, $force);
+
+        return $parts['before'].$newInner.$parts['after'];
+    }
+
+    protected function modifyInfolistEntries(string $content, array $entries, array $analysis, $panel, bool $force = false): string
+    {
+        foreach ($entries as $entry) {
+            if ($entry['has_label'] && config('filament-localization.preserve_existing_labels', false) && ! $force) {
+                continue;
+            }
+
+            $component = $entry['component'];
+            $entryName = $entry['name'];
+            $translationKey = $this->buildTranslationKey($analysis, $panel, $entry['translation_key']);
+
+            if ($entry['has_label']) {
+                $escapedEntryName = preg_quote($entryName, '/');
+                $pattern = "/({$component}::make\(['\"]".$escapedEntryName."['\"]\)(?:.*?))->label\((?:[^()]*|\([^()]*\))*\)/s";
+                $replacement = "$1->label(__('$translationKey'))";
+
+                $newContent = preg_replace($pattern, $replacement, $content, 1);
+
+                if ($newContent !== $content) {
+                    $content = $newContent;
+                    $this->statistics->incrementFieldsLocalized();
+                }
+            } else {
+                $escapedEntryName = preg_quote($entryName, '/');
+                $pattern = "/({$component}::make\(['\"]".$escapedEntryName."['\"]\))/";
+                $replacement = "$1\n                    ->label(__('$translationKey'))";
+
+                $newContent = preg_replace($pattern, $replacement, $content, 1);
+
+                if ($newContent !== $content) {
+                    $content = $newContent;
+                    $this->statistics->incrementFieldsLocalized();
+                }
+            }
+        }
+
+        return $content;
+    }
+
+    protected function modifyNavigationGroup(string $content, array $analysis, $panel, bool $force = false): string
+    {
+        $nav = $analysis['navigation_group'] ?? null;
+        if ($nav === null || ($nav['has_translation'] ?? false)) {
+            return $content;
+        }
+
+        $translationKey = $this->buildTranslationKey($analysis, $panel, $nav['translation_key']);
+
+        $patterns = [
+            '/protected\s+static\s+string\s*\|\s*\\\\UnitEnum\s*\|\s*null\s+\$navigationGroup\s*=\s*[\'"][^\'"]+[\'"]\s*;/' => 'protected static string|\UnitEnum|null $navigationGroup = null;',
+            '/protected\s+static\s+\?string\s+\$navigationGroup\s*=\s*[\'"][^\'"]+[\'"]\s*;/' => 'protected static ?string $navigationGroup = null;',
+            '/protected\s+static\s+string\s+\$navigationGroup\s*=\s*[\'"][^\'"]+[\'"]\s*;/' => 'protected static string $navigationGroup = null;',
+        ];
+
+        $replaced = false;
+        foreach ($patterns as $search => $replacement) {
+            $newContent = preg_replace($search, $replacement, $content, 1);
+            if ($newContent !== null && $newContent !== $content) {
+                $content = $newContent;
+                $replaced = true;
+
+                break;
+            }
+        }
+
+        if (! $replaced) {
+            return $content;
+        }
+
+        $method = "    public static function getNavigationGroup(): string|\\UnitEnum|null\n    {\n        return __('{$translationKey}');\n    }";
+
+        if (preg_match('/public\s+static\s+function\s+getNavigationGroup\s*\([^)]*\)\s*:\s*[^{]*\{[^}]*\}/s', $content)) {
+            $content = preg_replace(
+                '/public\s+static\s+function\s+getNavigationGroup\s*\([^)]*\)\s*:\s*[^{]*\{[^}]*\}/s',
+                $method,
+                $content,
+                1
+            );
+        } else {
+            $pattern = '/(\n\s*}\s*)$/';
+            if (preg_match($pattern, $content, $matches, PREG_OFFSET_CAPTURE)) {
+                $insertPosition = $matches[0][1];
+                $content = substr_replace($content, "\n".$method."\n", $insertPosition, 0);
+            }
+        }
+
+        return $content;
     }
 
     protected function modifyFields(string $content, array $fields, array $analysis, $panel, bool $force = false): string
@@ -346,6 +490,14 @@ class ResourceModifier
 
                 // Use limit of 1 to replace only one occurrence at a time
                 $content = preg_replace($pattern, $replacement, $content, 1);
+
+                // Also normalize already-translated section keys to the newly generated key.
+                if (! empty($section['original_translation_key'] ?? null)) {
+                    $originalTranslationKey = preg_quote($section['original_translation_key'], '/');
+                    $translatedPattern = "/{$component}::make\(__\(['\"]{$originalTranslationKey}['\"]\)\)/";
+                    $translatedReplacement = "{$component}::make(__('$translationKey'))";
+                    $content = preg_replace($translatedPattern, $translatedReplacement, $content, 1);
+                }
 
                 // Handle descriptions for layout components - only modify if they already exist
                 if (isset($section['has_description']) && $section['has_description']) {

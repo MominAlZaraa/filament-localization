@@ -55,7 +55,18 @@ class LocalizationService
             // Analyze the resource to find all localizable fields
             $analysis = $this->analyzer->analyze($resourceClass, $panel);
 
-            if (empty($analysis['fields']) && empty($analysis['actions']) && empty($analysis['columns'])) {
+            $hasInfolist = ! empty($analysis['infolist_entries'] ?? []);
+            $hasNavigationGroup = is_array($analysis['navigation_group'] ?? null);
+            $hasSectionsOrFilters = ! empty($analysis['sections'] ?? []) || ! empty($analysis['filters'] ?? []);
+
+            if (
+                empty($analysis['fields']) &&
+                empty($analysis['actions']) &&
+                empty($analysis['columns']) &&
+                ! $hasInfolist &&
+                ! $hasNavigationGroup &&
+                ! $hasSectionsOrFilters
+            ) {
                 return; // Nothing to localize
             }
 
@@ -150,7 +161,17 @@ class LocalizationService
                 return; // No custom content to localize
             }
 
-            if (empty($analysis['fields']) && empty($analysis['columns']) && empty($analysis['actions']) && empty($analysis['sections']) && empty($analysis['filters']) && ! $force) {
+            if (
+                empty($analysis['fields']) &&
+                empty($analysis['columns']) &&
+                empty($analysis['actions']) &&
+                empty($analysis['sections']) &&
+                empty($analysis['filters']) &&
+                empty($analysis['table_messages'] ?? []) &&
+                empty($analysis['key_value_auxiliary_labels'] ?? []) &&
+                empty($analysis['action_modal_copy'] ?? []) &&
+                ! $force
+            ) {
                 return; // Nothing to localize
             }
 

@@ -345,7 +345,11 @@ class PageAnalyzer
 
     protected function generateTranslationKey(string $fieldName): string
     {
-        return Str::snake($fieldName);
+        $key = Str::snake($fieldName);
+        $key = preg_replace('/[^a-z0-9_.]+/', '_', $key);
+        $key = preg_replace('/_+/', '_', $key);
+
+        return trim($key, '_');
     }
 
     protected function analyzeLabels(string $content): array

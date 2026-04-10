@@ -82,6 +82,9 @@ class RelationManagerAnalyzer
             'actions' => [],
             'sections' => [],
             'filters' => [],
+            'table_messages' => [],
+            'key_value_auxiliary_labels' => [],
+            'action_modal_copy' => [],
             'has_custom_content' => false,
             'labels' => [],
             'navigation' => [],
@@ -110,6 +113,12 @@ class RelationManagerAnalyzer
 
         // Analyze filters
         $analysis['filters'] = $this->analyzeFilters($content);
+
+        $analysis['table_messages'] = $this->analyzeTableMessages($content);
+
+        $analysis['key_value_auxiliary_labels'] = $this->analyzeKeyValueAuxiliaryLabels($content);
+
+        $analysis['action_modal_copy'] = $this->analyzeActionModalCopy($content);
 
         // Analyze labels, navigation, and titles
         $analysis['labels'] = $this->analyzeLabels($content);
@@ -146,6 +155,21 @@ class RelationManagerAnalyzer
             '/->label\([\'"][^\'"]+[\'"]\)/',
             '/->title\([\'"][^\'"]+[\'"]\)/',
             '/->heading\([\'"][^\'"]+[\'"]\)/',
+
+            // Table empty state / heading (Filament v3+)
+            '/->emptyStateHeading\s*\(/',
+            '/->emptyStateDescription\s*\(/',
+
+            // Relation manager title property / getter
+            '/protected\s+static\s+\?string\s+\$title\s*=\s*[\'"][^\'"]+[\'"]/',
+            '/public\s+static\s+function\s+getTitle\s*\(/',
+
+            // KeyValue auxiliary labels & action modals
+            '/->keyLabel\s*\(/',
+            '/->valueLabel\s*\(/',
+            '/->modalHeading\s*\(/',
+            '/->modalDescription\s*\(/',
+            '/->modalSubmitActionLabel\s*\(/',
         ];
 
         foreach ($patterns as $pattern) {
@@ -180,12 +204,13 @@ class RelationManagerAnalyzer
 
                     // Check if this field already has a label
                     $hasLabel = $this->hasLabel($content, $fieldName, $component);
+                    $literalLabel = $hasLabel ? $this->extractQuotedLabelAfterMake($content, $fieldName, $component) : null;
 
                     $fields[] = [
                         'name' => $fieldName,
                         'component' => $component,
                         'has_label' => $hasLabel,
-                        'default_label' => $this->generateLabel($fieldName),
+                        'default_label' => $literalLabel ?? $this->generateLabel($fieldName),
                         'translation_key' => $this->generateTranslationKey($fieldName),
                     ];
                 }
@@ -209,12 +234,13 @@ class RelationManagerAnalyzer
                 foreach ($matches[1] as $columnName) {
                     // Check if this column already has a label
                     $hasLabel = $this->hasLabel($content, $columnName, $column);
+                    $literalLabel = $hasLabel ? $this->extractQuotedLabelAfterMake($content, $columnName, $column) : null;
 
                     $columns[] = [
                         'name' => $columnName,
                         'component' => $column,
                         'has_label' => $hasLabel,
-                        'default_label' => $this->generateLabel($columnName),
+                        'default_label' => $literalLabel ?? $this->generateLabel($columnName),
                         'translation_key' => $this->generateTranslationKey($columnName),
                     ];
                 }
@@ -248,9 +274,144 @@ class RelationManagerAnalyzer
                     ];
                 }
             }
+
+            // Filament v5: CreateAction::make() / EditAction::make() with no name
+            $emptyMakePattern = "/(?<![:\\w]){$component}::make\(\)/";
+            preg_match_all($emptyMakePattern, $content, $emptyMatches, PREG_OFFSET_CAPTURE);
+
+            foreach ($emptyMatches[0] ?? [] as $occurrence) {
+                $syntheticName = $this->syntheticActionName($component);
+                $hasLabel = $this->hasLabelAfterPosition($content, $occurrence[1], $component);
+
+                $actions[] = [
+                    'name' => $syntheticName,
+                    'component' => $component,
+                    'has_label' => $hasLabel,
+                    'default_label' => $this->generateLabel($syntheticName),
+                    'translation_key' => $this->generateTranslationKey($syntheticName),
+                    'unnamed_make' => true,
+                ];
+            }
         }
 
         return $actions;
+    }
+
+    protected function syntheticActionName(string $component): string
+    {
+        return match ($component) {
+            'CreateAction' => 'create',
+            'EditAction' => 'edit',
+            'DeleteAction' => 'delete',
+            'ViewAction' => 'view',
+            'BulkAction' => 'bulk',
+            default => Str::snake(str_replace('Action', '', $component)),
+        };
+    }
+
+    /**
+     * Whether an unnamed {@see Action::make()} chain already has ->label( after the make() call.
+     */
+    protected function hasLabelAfterPosition(string $content, int $makePosition, string $component): bool
+    {
+        $prefix = $component.'::make()';
+        $startPos = $makePosition + strlen($prefix);
+        $slice = $this->sliceChainAfterMake($content, $startPos);
+
+        return str_contains($slice, '->label(');
+    }
+
+    /**
+     * @return list<array{field: string, chain_method: string, value: string, translation_key: string, has_translation: bool}>
+     */
+    protected function analyzeKeyValueAuxiliaryLabels(string $content): array
+    {
+        $out = [];
+
+        $pattern = "/(?<![:\\w])KeyValue::make\(['\"]([^'\"]+)['\"]\)/";
+
+        if (! preg_match_all($pattern, $content, $matches, PREG_OFFSET_CAPTURE)) {
+            return $out;
+        }
+
+        foreach ($matches[1] as $idx => $fieldMatch) {
+            $fieldName = $fieldMatch[0];
+            $offset = $matches[0][$idx][1] + strlen($matches[0][$idx][0]);
+
+            $fieldContent = $this->sliceChainAfterMake($content, $offset);
+
+            foreach (['keyLabel' => 'key_label', 'valueLabel' => 'value_label'] as $method => $suffix) {
+                if (preg_match('/->'.$method.'\s*\(\s*__\s*\(/s', $fieldContent)) {
+                    continue;
+                }
+
+                if (preg_match('/->'.$method.'\s*\(\s*[\'"]([^\'"]+)[\'"]\s*\)/s', $fieldContent, $m)) {
+                    $baseKey = $this->generateTranslationKey($fieldName);
+
+                    $out[] = [
+                        'field' => $fieldName,
+                        'chain_method' => $method,
+                        'value' => $m[1],
+                        'translation_key' => $baseKey.'_'.$suffix,
+                        'has_translation' => false,
+                    ];
+                }
+            }
+        }
+
+        return $out;
+    }
+
+    /**
+     * @return list<array{filament_method: string, value: string, translation_key: string, has_translation: bool}>
+     */
+    protected function analyzeActionModalCopy(string $content): array
+    {
+        $out = [];
+        $counts = [];
+
+        $filamentMethods = [
+            'modalHeading',
+            'modalDescription',
+            'modalSubmitActionLabel',
+            'modalCancelActionLabel',
+        ];
+
+        foreach ($filamentMethods as $method) {
+            $pattern = '/->'.$method.'\s*\(\s*[\'"]([^\'"]+)[\'"]\s*\)/';
+
+            if (! preg_match_all($pattern, $content, $matches)) {
+                continue;
+            }
+
+            foreach ($matches[1] as $value) {
+                $counts[$method] = ($counts[$method] ?? 0) + 1;
+                $n = $counts[$method];
+                $baseKey = Str::snake($method);
+                $translationKey = $n === 1 ? $baseKey : $baseKey.'_'.$n;
+
+                $out[] = [
+                    'filament_method' => $method,
+                    'value' => $value,
+                    'translation_key' => $translationKey,
+                    'has_translation' => false,
+                ];
+            }
+        }
+
+        return $out;
+    }
+
+    protected function sliceChainAfterMake(string $content, int $startPos): string
+    {
+        $len = strlen($content);
+        $endPattern = "/\n\s*(?:\w+::make\(|[\]\}]\))/";
+
+        if (preg_match($endPattern, $content, $endMatches, PREG_OFFSET_CAPTURE, $startPos)) {
+            return substr($content, $startPos, $endMatches[0][1] - $startPos);
+        }
+
+        return substr($content, $startPos, min(4000, $len - $startPos));
     }
 
     protected function analyzeSections(string $content): array
@@ -307,6 +468,75 @@ class RelationManagerAnalyzer
         return $filters;
     }
 
+    /**
+     * @return list<array{type: string, value: string, translation_key: string, has_translation: bool}>
+     */
+    protected function analyzeTableMessages(string $content): array
+    {
+        $messages = [];
+        $typeCounts = [];
+
+        $specs = [
+            'empty_state_heading' => 'emptyStateHeading',
+            'empty_state_description' => 'emptyStateDescription',
+            'table_heading' => 'heading',
+        ];
+
+        foreach ($specs as $type => $method) {
+            $pattern = '/->'.$method.'\s*\(\s*[\'"]([^\'"]+)[\'"]\s*\)/';
+
+            if (! preg_match_all($pattern, $content, $matches)) {
+                continue;
+            }
+
+            foreach ($matches[1] as $value) {
+                $typeCounts[$type] = ($typeCounts[$type] ?? 0) + 1;
+                $suffix = $typeCounts[$type];
+                $translationKey = $suffix === 1 ? $type : $type.'_'.$suffix;
+
+                $messages[] = [
+                    'type' => $type,
+                    'method' => $method,
+                    'value' => $value,
+                    'translation_key' => $translationKey,
+                    'has_translation' => false,
+                ];
+            }
+        }
+
+        return $messages;
+    }
+
+    protected function extractQuotedLabelAfterMake(string $content, string $fieldName, string $component): ?string
+    {
+        $makePattern = "/(?<![:\\w]){$component}::make\(['\"]".preg_quote($fieldName, '/')."['\"]\)/";
+
+        if (! preg_match($makePattern, $content, $matches, PREG_OFFSET_CAPTURE)) {
+            return null;
+        }
+
+        $startPos = $matches[0][1] + strlen($matches[0][0]);
+        $endPattern = "/\n\s*(?:\w+::make\(|[\]\}]\))/";
+
+        if (preg_match($endPattern, $content, $endMatches, PREG_OFFSET_CAPTURE, $startPos)) {
+            $endPos = $endMatches[0][1];
+        } else {
+            $endPos = strlen($content);
+        }
+
+        $fieldContent = substr($content, $startPos, $endPos - $startPos);
+
+        if (preg_match('/->label\(\s*__\s*\(/s', $fieldContent)) {
+            return null;
+        }
+
+        if (preg_match('/->label\(\s*[\'"]([^\'"]+)[\'"]\s*\)/', $fieldContent, $m)) {
+            return $m[1];
+        }
+
+        return null;
+    }
+
     protected function hasLabel(string $content, string $fieldName, string $component): bool
     {
         // Look for ->label() after the make() call for this specific field
@@ -361,7 +591,11 @@ class RelationManagerAnalyzer
 
     protected function generateTranslationKey(string $fieldName): string
     {
-        return Str::snake($fieldName);
+        $key = Str::snake($fieldName);
+        $key = preg_replace('/[^a-z0-9_.]+/', '_', $key);
+        $key = preg_replace('/_+/', '_', $key);
+
+        return trim($key, '_');
     }
 
     protected function analyzeLabels(string $content): array
@@ -374,15 +608,26 @@ class RelationManagerAnalyzer
         ];
 
         foreach ($labelMethods as $method => $type) {
-            if (preg_match('/public\s+static\s+function\s+'.$method.'\s*\([^)]*\)\s*:\s*string\s*{[^}]*return\s+[\'"]([^\'"]+)[\'"]/', $content, $matches)) {
-                $labels[] = [
-                    'method' => $method,
-                    'type' => $type,
-                    'value' => $matches[1],
-                    'has_translation' => str_contains($matches[1], '__('),
-                    'translation_key' => $this->generateTranslationKey($type),
-                    'is_static' => true,
-                ];
+            if (preg_match('/public\s+static\s+function\s+'.$method.'\s*\([^)]*\)\s*:\s*string\s*\{/s', $content, $m, PREG_OFFSET_CAPTURE)) {
+                $body = $this->extractMethodBodyFromFirstBrace($content, $m[0][1] + strlen($m[0][0]) - 1);
+                if ($body === null) {
+                    continue;
+                }
+
+                if (preg_match('/return\s+__\s*\(/s', $body)) {
+                    continue;
+                }
+
+                if (preg_match('/return\s+[\'"]([^\'"]+)[\'"]/s', $body, $sm)) {
+                    $labels[] = [
+                        'method' => $method,
+                        'type' => $type,
+                        'value' => $sm[1],
+                        'has_translation' => false,
+                        'translation_key' => $this->generateTranslationKey($type),
+                        'is_static' => true,
+                    ];
+                }
             }
         }
 
@@ -440,5 +685,25 @@ class RelationManagerAnalyzer
         }
 
         return $titles;
+    }
+
+    protected function extractMethodBodyFromFirstBrace(string $content, int $openBracePos): ?string
+    {
+        $depth = 0;
+        $len = strlen($content);
+
+        for ($i = $openBracePos; $i < $len; $i++) {
+            $c = $content[$i];
+            if ($c === '{') {
+                $depth++;
+            } elseif ($c === '}') {
+                $depth--;
+                if ($depth === 0) {
+                    return substr($content, $openBracePos + 1, $i - $openBracePos - 1);
+                }
+            }
+        }
+
+        return null;
     }
 }

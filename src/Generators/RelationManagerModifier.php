@@ -2,9 +2,11 @@
 
 namespace MominAlZaraa\FilamentLocalization\Generators;
 
+use Filament\Resources\RelationManagers\RelationManager;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Str;
 use MominAlZaraa\FilamentLocalization\Services\StatisticsService;
+use ReflectionClass;
 
 class RelationManagerModifier
 {
@@ -34,11 +36,17 @@ class RelationManagerModifier
         // Modify form fields
         $content = $this->modifyFields($content, $analysis['fields'], $analysis, $panel, $force);
 
+        $content = $this->modifyKeyValueAuxiliaryLabels($content, $analysis['key_value_auxiliary_labels'] ?? [], $analysis, $panel, $force);
+
         // Modify table columns
         $content = $this->modifyColumns($content, $analysis['columns'], $analysis, $panel, $force);
 
+        $content = $this->modifyTableMessages($content, $analysis['table_messages'] ?? [], $analysis, $panel, $force);
+
         // Modify actions
         $content = $this->modifyActions($content, $analysis['actions'], $analysis, $panel, $force);
+
+        $content = $this->modifyActionModalCopy($content, $analysis['action_modal_copy'] ?? [], $analysis, $panel, $force);
 
         // Modify sections
         $content = $this->modifySections($content, $analysis['sections'], $analysis, $panel, $force);
@@ -52,7 +60,7 @@ class RelationManagerModifier
         $content = $this->modifyTitles($content, $analysis['titles'], $analysis, $panel, $force);
 
         // Add missing label methods if needed
-        $content = $this->addMissingLabelMethods($content, $analysis, $panel);
+        $content = $this->addMissingLabelMethods($content, $analysis, $panel, $relationManagerClass);
 
         // If force mode is enabled, update any existing translation keys to use the correct panel
         if ($force) {
@@ -156,17 +164,107 @@ class RelationManagerModifier
         return $content;
     }
 
+    protected function modifyTableMessages(string $content, array $messages, array $analysis, $panel, bool $force = false): string
+    {
+        foreach ($messages as $message) {
+            if ($message['has_translation'] ?? false) {
+                continue;
+            }
+
+            $method = $message['method'];
+            $translationKey = $this->buildTranslationKey($analysis, $panel, $message['translation_key']);
+            $escapedValue = preg_quote($message['value'], '/');
+            $pattern = '/->'.$method.'\s*\(\s*[\'"]'.$escapedValue.'[\'"]\s*\)/';
+            $replacement = "->{$method}(__('$translationKey'))";
+
+            $newContent = preg_replace($pattern, $replacement, $content, 1);
+
+            if ($newContent !== $content) {
+                $content = $newContent;
+            }
+        }
+
+        return $content;
+    }
+
+    protected function modifyKeyValueAuxiliaryLabels(string $content, array $items, array $analysis, $panel, bool $force = false): string
+    {
+        foreach ($items as $item) {
+            if (($item['has_translation'] ?? false) && ! $force) {
+                continue;
+            }
+
+            $method = $item['chain_method'];
+            $translationKey = $this->buildTranslationKey($analysis, $panel, $item['translation_key']);
+            $escapedValue = preg_quote($item['value'], '/');
+            $pattern = '/->'.$method.'\s*\(\s*[\'"]'.$escapedValue.'[\'"]\s*\)/';
+            $replacement = "->{$method}(__('$translationKey'))";
+
+            $newContent = preg_replace($pattern, $replacement, $content, 1);
+
+            if ($newContent !== $content) {
+                $content = $newContent;
+                $this->statistics->incrementFieldsLocalized();
+            }
+        }
+
+        return $content;
+    }
+
+    protected function modifyActionModalCopy(string $content, array $items, array $analysis, $panel, bool $force = false): string
+    {
+        foreach ($items as $item) {
+            if (($item['has_translation'] ?? false) && ! $force) {
+                continue;
+            }
+
+            $method = $item['filament_method'];
+            $translationKey = $this->buildTranslationKey($analysis, $panel, $item['translation_key']);
+            $escapedValue = preg_quote($item['value'], '/');
+            $pattern = '/->'.$method.'\s*\(\s*[\'"]'.$escapedValue.'[\'"]\s*\)/';
+            $replacement = "->{$method}(__('$translationKey'))";
+
+            $newContent = preg_replace($pattern, $replacement, $content, 1);
+
+            if ($newContent !== $content) {
+                $content = $newContent;
+                $this->statistics->incrementActionsLocalized();
+            }
+        }
+
+        return $content;
+    }
+
     protected function modifyActions(string $content, array $actions, array $analysis, $panel, bool $force = false): string
     {
         foreach ($actions as $action) {
             // Skip if preserve existing labels is enabled and action has a label
-            if ($action['has_label'] && config('filament-localization.preserve_existing_labels', false)) {
+            if ($action['has_label'] && config('filament-localization.preserve_existing_labels', false) && ! $force) {
                 continue;
             }
 
             $component = $action['component'];
             $actionName = $action['name'];
             $translationKey = $this->buildTranslationKey($analysis, $panel, $action['translation_key']);
+
+            if (! empty($action['unnamed_make'])) {
+                if ($action['has_label']) {
+                    $pattern = "/({$component}::make\(\)(?:.*?))->label\((?:[^()]*|\([^()]*\))*\)/s";
+                    $replacement = "$1->label(__('$translationKey'))";
+                } else {
+                    $pattern = "/({$component}::make\(\))/";
+                    $replacement = "$1\n                    ->label(__('$translationKey'))";
+                }
+
+                $newContent = preg_replace($pattern, $replacement, $content, 1);
+
+                if ($newContent !== $content) {
+                    $content = $newContent;
+                    $this->statistics->incrementActionsLocalized();
+                }
+
+                continue;
+            }
 
             // If action already has a label, we need to replace it
             if ($action['has_label']) {
@@ -355,37 +453,52 @@ class RelationManagerModifier
         return $content;
     }
 
-    protected function addMissingLabelMethods(string $content, array $analysis, $panel): string
+    protected function addMissingLabelMethods(string $content, array $analysis, $panel, string $relationManagerClass): string
     {
-        $relationManagerName = $analysis['relation_manager_name'];
         $translationKey = $this->buildTranslationKey($analysis, $panel, 'title');
 
-        // Check if static getTitle method exists (RelationManager uses static getTitle)
-        if (! preg_match('/public\s+static\s+function\s+getTitle\s*\(/', $content)) {
-            // Add Model import if not already present
-            if (! preg_match('/use\s+Illuminate\\\\Database\\\\Eloquent\\\\Model;/', $content)) {
-                // Find the last use statement and add Model import after it
-                if (preg_match_all('/use\s+[^;]+;/', $content, $matches, PREG_OFFSET_CAPTURE)) {
-                    $lastUseStatement = end($matches[0]);
-                    $insertPosition = $lastUseStatement[1] + strlen($lastUseStatement[0]);
-                    $import = "\nuse Illuminate\\Database\\Eloquent\\Model;";
-                    $content = substr_replace($content, $import, $insertPosition, 0);
-                }
-            }
+        if (! $this->shouldInjectGetTitleOverride($relationManagerClass)) {
+            return $content;
+        }
 
-            // Add static getTitle method before the closing brace
-            $pattern = '/(\n\s*}\s*)$/';
-            if (preg_match($pattern, $content, $matches, PREG_OFFSET_CAPTURE)) {
-                $insertPosition = $matches[0][1];
-                $method = "\n    public static function getTitle(Model \$ownerRecord, string \$pageClass): string\n    {\n        return __('$translationKey');\n    }\n";
-                $content = substr_replace($content, $method, $insertPosition, 0);
+        if (preg_match('/public\s+static\s+function\s+getTitle\s*\(/', $content)) {
+            return $content;
+        }
+
+        if (! preg_match('/use\s+Illuminate\\\\Database\\\\Eloquent\\\\Model;/', $content)) {
+            if (preg_match_all('/use\s+[^;]+;/', $content, $matches, PREG_OFFSET_CAPTURE)) {
+                $lastUseStatement = end($matches[0]);
+                $insertPosition = $lastUseStatement[1] + strlen($lastUseStatement[0]);
+                $import = "\nuse Illuminate\\Database\\Eloquent\\Model;";
+                $content = substr_replace($content, $import, $insertPosition, 0);
             }
         }
 
-        // Note: We don't add static $title property as it can't contain function calls
-        // The getTitle() method will handle the translation
+        $pattern = '/(\n\s*}\s*)$/';
+        if (preg_match($pattern, $content, $matches, PREG_OFFSET_CAPTURE)) {
+            $insertPosition = $matches[0][1];
+            $method = "\n    public static function getTitle(Model \$ownerRecord, string \$pageClass): string\n    {\n        return __('$translationKey');\n    }\n";
+            $content = substr_replace($content, $method, $insertPosition, 0);
+        }
 
         return $content;
+    }
+
+    /**
+     * True when the relation manager still uses Filament's default {@see RelationManager::getTitle()} (relationship-based English title).
+     */
+    protected function shouldInjectGetTitleOverride(string $relationManagerClass): bool
+    {
+        try {
+            $ref = new ReflectionClass($relationManagerClass);
+            if (! $ref->hasMethod('getTitle')) {
+                return true;
+            }
+
+            return $ref->getMethod('getTitle')->getDeclaringClass()->getName() === RelationManager::class;
+        } catch (\Throwable) {
+            return false;
+        }
     }
 
     protected function createBackup(string $filePath): void

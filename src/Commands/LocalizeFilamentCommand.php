@@ -491,11 +491,12 @@ class LocalizeFilamentCommand extends Command
             if ($filePath && File::exists($filePath)) {
                 $content = File::get($filePath);
 
-                // Look for relation manager references
-                preg_match_all('/([A-Za-z]+RelationManager)::class/', $content, $matches);
+                // Look for relation manager references (simple or namespaced class names)
+                preg_match_all('/([A-Za-z0-9_\\\\]+RelationManager)::class/', $content, $matches);
 
                 if (! empty($matches[1])) {
                     foreach ($matches[1] as $relationManager) {
+                        $relationManager = ltrim($relationManager, '\\');
                         // Try to resolve the full class name
                         $fullClassName = $this->resolveRelationManagerClass($relationManager, $resourceClass, $content);
                         if ($fullClassName) {
@@ -648,33 +649,31 @@ class LocalizeFilamentCommand extends Command
 
     protected function resolveRelationManagerClass(string $relationManagerClass, string $resourceClass, string $content): ?string
     {
-        // If the class name doesn't have a namespace, we need to resolve it from the use statements
-        if (! str_contains($relationManagerClass, '\\')) {
-            // Extract use statements from the content
-            preg_match_all('/use\s+([^;]+);/', $content, $useMatches);
+        if (str_contains($relationManagerClass, '\\')) {
+            return $relationManagerClass;
+        }
 
-            foreach ($useMatches[1] as $useStatement) {
-                if (str_ends_with($useStatement, '\\'.$relationManagerClass) || $useStatement === $relationManagerClass) {
-                    return $useStatement;
-                }
+        // Resolve short class name from use statements
+        preg_match_all('/use\s+([^;]+);/', $content, $useMatches);
 
-                // Handle aliased imports (use X as Y)
-                if (preg_match('/(.+)\s+as\s+(.+)/', $useStatement, $aliasMatch)) {
-                    if (trim($aliasMatch[2]) === $relationManagerClass) {
-                        return trim($aliasMatch[1]);
-                    }
-                }
+        foreach ($useMatches[1] as $useStatement) {
+            if (str_ends_with($useStatement, '\\'.$relationManagerClass) || $useStatement === $relationManagerClass) {
+                return $useStatement;
             }
 
-            // If still not resolved, assume it's in the same namespace as the resource
-            if (strpos($relationManagerClass, '\\') === false) {
-                $resourceNamespace = (new \ReflectionClass($resourceClass))->getNamespaceName();
-
-                return $resourceNamespace.'\\'.$relationManagerClass;
+            // Handle aliased imports (use X as Y)
+            if (preg_match('/(.+)\s+as\s+(.+)/', $useStatement, $aliasMatch)) {
+                if (trim($aliasMatch[2]) === $relationManagerClass) {
+                    return trim($aliasMatch[1]);
+                }
             }
         }
 
-        return $relationManagerClass;
+        $resourceReflection = new \ReflectionClass($resourceClass);
+        $resourceNamespace = $resourceReflection->getNamespaceName();
+        $resourceBasename = $resourceReflection->getShortName();
+
+        return $resourceNamespace.'\\'.$resourceBasename.'\\RelationManagers\\'.$relationManagerClass;
     }
 
     protected function isCustomPage(string $pageClass): bool

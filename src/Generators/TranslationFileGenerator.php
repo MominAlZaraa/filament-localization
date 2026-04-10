@@ -100,19 +100,15 @@ class TranslationFileGenerator
         $navigationLabel = $staticProperties['navigation_label'] ?? Str::plural($modelLabel);
         $pluralModelLabel = $staticProperties['plural_model_label'] ?? Str::plural($modelLabel);
 
-        // Handle getModelLabel method - if it exists, we should remove or nullify static properties
-        if ($staticProperties['has_get_model_label'] ?? false) {
-            // If getModelLabel exists, we don't need static property translations
-            // The getModelLabel method will handle the labels dynamically
-            // We can optionally add a comment or skip these translations
-        } else {
-            // Only add translations if they don't already exist in the target file
-            // or if we're not preserving existing labels
-            if (! config('filament-localization.preserve_existing_labels', false)) {
-                $translations['navigation_label'] = $navigationLabel;
-                $translations['model_label'] = $modelLabel;
-                $translations['plural_model_label'] = $pluralModelLabel;
-            }
+        // Resource label keys must exist whenever resource getter methods are generated.
+        // Otherwise UI shows raw translation keys like "filament/admin/...model_label".
+        if (
+            ! config('filament-localization.preserve_existing_labels', false)
+            || ($staticProperties['has_get_model_label'] ?? false)
+        ) {
+            $translations['navigation_label'] = $navigationLabel;
+            $translations['model_label'] = $modelLabel;
+            $translations['plural_model_label'] = $pluralModelLabel;
         }
 
         // Add field translations
@@ -180,6 +176,17 @@ class TranslationFileGenerator
             if (! $filter['has_label'] || ! config('filament-localization.preserve_existing_labels', false)) {
                 $translations[$filter['translation_key']] = $filter['default_label'];
             }
+        }
+
+        foreach ($analysis['infolist_entries'] ?? [] as $entry) {
+            if (! $entry['has_label'] || ! config('filament-localization.preserve_existing_labels', false)) {
+                $translations[$entry['translation_key']] = $entry['default_label'];
+            }
+        }
+
+        $navigationGroup = $analysis['navigation_group'] ?? null;
+        if (is_array($navigationGroup) && ! ($navigationGroup['has_translation'] ?? false)) {
+            $translations[$navigationGroup['translation_key']] = $navigationGroup['value'];
         }
 
         return $translations;
@@ -682,11 +689,26 @@ class TranslationFileGenerator
             }
         }
 
-        // Add default title if no title exists
-        if (empty($analysis['labels']) && empty($analysis['titles'])) {
-            $relationManagerName = $analysis['relation_manager_name'];
-            $defaultTitle = $this->generateDefaultTitle($relationManagerName);
-            $translations['title'] = $defaultTitle;
+        foreach ($analysis['table_messages'] ?? [] as $message) {
+            if (! ($message['has_translation'] ?? false)) {
+                $translations[$message['translation_key']] = $message['value'];
+            }
+        }
+
+        foreach ($analysis['key_value_auxiliary_labels'] ?? [] as $item) {
+            if (! ($item['has_translation'] ?? false)) {
+                $translations[$item['translation_key']] = $item['value'];
+            }
+        }
+
+        foreach ($analysis['action_modal_copy'] ?? [] as $item) {
+            if (! ($item['has_translation'] ?? false)) {
+                $translations[$item['translation_key']] = $item['value'];
+            }
+        }
+
+        if (! array_key_exists('title', $translations)) {
+            $translations['title'] = $this->generateDefaultTitle($analysis['relation_manager_name']);
         }
 
         return $translations;
