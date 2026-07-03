@@ -41,8 +41,12 @@ class ResourceModifier
         // Group fields and columns by file
         $resourceFields = [];
         $resourceColumns = [];
+        $resourceActions = [];
+        $resourceFilters = [];
         $schemaFileFields = [];
         $schemaFileColumns = [];
+        $schemaFileActions = [];
+        $schemaFileFilters = [];
 
         foreach ($analysis['fields'] as $field) {
             if (isset($field['schema_file'])) {
@@ -60,6 +64,22 @@ class ResourceModifier
             }
         }
 
+        foreach ($analysis['actions'] as $action) {
+            if (isset($action['schema_file'])) {
+                $schemaFileActions[$action['schema_file']][] = $action;
+            } else {
+                $resourceActions[] = $action;
+            }
+        }
+
+        foreach ($analysis['filters'] as $filter) {
+            if (isset($filter['schema_file'])) {
+                $schemaFileFilters[$filter['schema_file']][] = $filter;
+            } else {
+                $resourceFilters[] = $filter;
+            }
+        }
+
         // Modify form fields in resource file
         $content = $this->modifyFields($content, $resourceFields, $analysis, $panel, $force);
 
@@ -67,13 +87,13 @@ class ResourceModifier
         $content = $this->modifyColumns($content, $resourceColumns, $analysis, $panel, $force);
 
         // Modify actions
-        $content = $this->modifyActions($content, $analysis['actions'], $analysis, $panel, $force);
+        $content = $this->modifyActions($content, $resourceActions, $analysis, $panel, $force);
 
         // Modify sections
         $content = $this->modifySections($content, $analysis['sections'], $analysis, $panel, $force);
 
         // Modify filters
-        $content = $this->modifyFilters($content, $analysis['filters'], $analysis, $panel, $force);
+        $content = $this->modifyFilters($content, $resourceFilters, $analysis, $panel, $force);
 
         // In force mode, update existing translation keys to use correct panel reference
         if ($force) {
@@ -87,7 +107,7 @@ class ResourceModifier
         }
 
         // Modify schema files
-        $this->modifySchemaFiles($schemaFileFields, $schemaFileColumns, $analysis, $panel, $force);
+        $this->modifySchemaFiles($schemaFileFields, $schemaFileColumns, $schemaFileActions, $schemaFileFilters, $analysis, $panel, $force);
     }
 
     /**
@@ -429,19 +449,39 @@ class ResourceModifier
     {
         foreach ($actions as $action) {
             // Skip if preserve existing labels is enabled and action has a label
-            if ($action['has_label'] && config('filament-localization.preserve_existing_labels', false)) {
+            if ($action['has_label'] && config('filament-localization.preserve_existing_labels', false) && ! $force) {
                 continue;
             }
 
+            $component = $action['component'] ?? 'Action';
             $actionName = $action['name'];
             $translationKey = $this->buildTranslationKey($analysis, $panel, $action['translation_key']);
+
+            if (! empty($action['unnamed_make'])) {
+                if ($action['has_label']) {
+                    $pattern = "/({$component}::make\(\)(?:.*?))->label\((?:[^()]*|\([^()]*\))*\)/s";
+                    $replacement = "$1->label(__('$translationKey'))";
+                } else {
+                    $pattern = "/({$component}::make\(\))/";
+                    $replacement = "$1\n                    ->label(__('$translationKey'))";
+                }
+
+                $newContent = preg_replace($pattern, $replacement, $content, 1);
+
+                if ($newContent !== $content) {
+                    $content = $newContent;
+                    $this->statistics->incrementActionsLocalized();
+                }
+
+                continue;
+            }
 
             // If action already has a label, we need to replace it
             if ($action['has_label']) {
                 $escapedActionName = preg_quote($actionName, '/');
 
                 // Pattern: Find make('action') followed by ->label() anywhere after it
-                $pattern = "/(Action::make\(['\"]".$escapedActionName."['\"]\)(?:.*?))->label\((?:[^()]*|\([^()]*\))*\)/s";
+                $pattern = "/({$component}::make\(['\"]".$escapedActionName."['\"]\)(?:.*?))->label\((?:[^()]*|\([^()]*\))*\)/s";
                 $replacement = "$1->label(__('$translationKey'))";
 
                 $newContent = preg_replace($pattern, $replacement, $content, 1);
@@ -453,7 +493,7 @@ class ResourceModifier
             } else {
                 // Add label after make()
                 $escapedActionName = preg_quote($actionName, '/');
-                $pattern = "/(Action::make\(['\"]".$escapedActionName."['\"]\))/";
+                $pattern = "/({$component}::make\(['\"]".$escapedActionName."['\"]\))/";
                 $replacement = "$1\n                    ->label(__('$translationKey'))";
 
                 $newContent = preg_replace($pattern, $replacement, $content, 1);
@@ -527,19 +567,38 @@ class ResourceModifier
     {
         foreach ($filters as $filter) {
             // Skip if preserve existing labels is enabled and filter has a label
-            if ($filter['has_label'] && config('filament-localization.preserve_existing_labels', false)) {
+            if ($filter['has_label'] && config('filament-localization.preserve_existing_labels', false) && ! $force) {
                 continue;
             }
 
+            $component = $filter['component'] ?? 'Filter';
             $filterName = $filter['name'];
             $translationKey = $this->buildTranslationKey($analysis, $panel, $filter['translation_key']);
+
+            if (! empty($filter['unnamed_make'])) {
+                if ($filter['has_label']) {
+                    $pattern = "/({$component}::make\(\)(?:.*?))->label\((?:[^()]*|\([^()]*\))*\)/s";
+                    $replacement = "$1->label(__('$translationKey'))";
+                } else {
+                    $pattern = "/({$component}::make\(\))/";
+                    $replacement = "$1\n                    ->label(__('$translationKey'))";
+                }
+
+                $newContent = preg_replace($pattern, $replacement, $content, 1);
+
+                if ($newContent !== $content) {
+                    $content = $newContent;
+                }
+
+                continue;
+            }
 
             // If filter already has a label, we need to replace it
             if ($filter['has_label']) {
                 $escapedFilterName = preg_quote($filterName, '/');
 
                 // Pattern: Find make('filter') followed by ->label() anywhere after it
-                $pattern = "/((?:Select|Ternary|)Filter::make\(['\"]".$escapedFilterName."['\"]\)(?:.*?))->label\((?:[^()]*|\([^()]*\))*\)/s";
+                $pattern = "/({$component}::make\(['\"]".$escapedFilterName."['\"]\)(?:.*?))->label\((?:[^()]*|\([^()]*\))*\)/s";
                 $replacement = "$1->label(__('$translationKey'))";
 
                 $newContent = preg_replace($pattern, $replacement, $content, 1);
@@ -550,7 +609,7 @@ class ResourceModifier
             } else {
                 // Add label after make()
                 $escapedFilterName = preg_quote($filterName, '/');
-                $pattern = "/((?:Select|Ternary|)Filter::make\(['\"]".$escapedFilterName."['\"]\))/";
+                $pattern = "/({$component}::make\(['\"]".$escapedFilterName."['\"]\))/";
                 $replacement = "$1\n                    ->label(__('$translationKey'))";
 
                 $newContent = preg_replace($pattern, $replacement, $content, 1);
@@ -583,12 +642,14 @@ class ResourceModifier
         File::copy($filePath, $backupPath);
     }
 
-    protected function modifySchemaFiles(array $schemaFileFields, array $schemaFileColumns, array $analysis, $panel, bool $force = false): void
+    protected function modifySchemaFiles(array $schemaFileFields, array $schemaFileColumns, array $schemaFileActions, array $schemaFileFilters, array $analysis, $panel, bool $force = false): void
     {
         // Get all unique schema files
         $schemaFiles = array_unique(array_merge(
             array_keys($schemaFileFields),
-            array_keys($schemaFileColumns)
+            array_keys($schemaFileColumns),
+            array_keys($schemaFileActions),
+            array_keys($schemaFileFilters)
         ));
 
         foreach ($schemaFiles as $schemaFilePath) {
@@ -612,6 +673,16 @@ class ResourceModifier
             // Modify columns in this schema file
             if (isset($schemaFileColumns[$schemaFilePath])) {
                 $content = $this->modifyColumns($content, $schemaFileColumns[$schemaFilePath], $analysis, $panel, $force);
+            }
+
+            // Modify actions in this schema file
+            if (isset($schemaFileActions[$schemaFilePath])) {
+                $content = $this->modifyActions($content, $schemaFileActions[$schemaFilePath], $analysis, $panel, $force);
+            }
+
+            // Modify filters in this schema file
+            if (isset($schemaFileFilters[$schemaFilePath])) {
+                $content = $this->modifyFilters($content, $schemaFileFilters[$schemaFilePath], $analysis, $panel, $force);
             }
 
             // Only write if content changed

@@ -21,6 +21,7 @@ class WidgetAnalyzer
 
         $analysis = [
             'widget_name' => class_basename($widgetClass),
+            'file_path' => $filePath,
             'panel' => $panel->getId(),
             'stats' => $this->analyzeStats($content),
             'custom_content' => $this->hasCustomContent($content),
@@ -32,66 +33,121 @@ class WidgetAnalyzer
     protected function analyzeStats(string $content): array
     {
         $stats = [];
+        $seenKeys = [];
 
-        // Pattern to match Stat::make() calls with hardcoded strings
-        $pattern = '/Stat::make\s*\(\s*[\'"]([^\'"]+)[\'"]\s*,\s*[^)]+\)/';
+        $this->collectStat($stats, $seenKeys, 'stat_title', function (string $value) use ($content) {
+            $pattern = '/Stat::make\s*\(\s*[\'"]'.preg_quote($value, '/').'[\'"]\s*,\s*[^)]+\)/';
 
-        if (preg_match_all($pattern, $content, $matches, PREG_SET_ORDER)) {
-            foreach ($matches as $match) {
-                $stats[] = [
-                    'type' => 'stat_title',
-                    'value' => $match[1],
-                    'translation_key' => Str::snake($match[1]),
-                    'has_translation' => false,
-                ];
-            }
-        }
+            return preg_match($pattern, $content) === 1;
+        }, $content, '/Stat::make\s*\(\s*[\'"]([^\'"]+)[\'"]\s*,\s*[^)]+\)/');
 
-        // Pattern to match ->description() calls with hardcoded strings
-        $descriptionPattern = '/->description\s*\(\s*[\'"]([^\'"]+)[\'"]\s*\)/';
+        $this->collectStat($stats, $seenKeys, 'stat_description', fn (string $value) => true, $content, '/->description\s*\(\s*[\'"]([^\'"]+)[\'"]\s*\)/');
 
-        if (preg_match_all($descriptionPattern, $content, $matches, PREG_SET_ORDER)) {
-            foreach ($matches as $match) {
-                $stats[] = [
-                    'type' => 'stat_description',
-                    'value' => $match[1],
-                    'translation_key' => Str::snake($match[1]),
-                    'has_translation' => false,
-                ];
-            }
-        }
+        $this->collectStat($stats, $seenKeys, 'widget_property', fn (string $value) => true, $content, '/->(?:title|heading|label|placeholder|helper|hint|description)\s*\(\s*[\'"]([^\'"]+)[\'"]\s*\)/');
 
-        // Pattern to match other hardcoded strings in widget methods
-        $methodPattern = '/->(?:title|label|placeholder|helper|hint)\s*\(\s*[\'"]([^\'"]+)[\'"]\s*\)/';
-
-        if (preg_match_all($methodPattern, $content, $matches, PREG_SET_ORDER)) {
-            foreach ($matches as $match) {
-                $stats[] = [
-                    'type' => 'widget_property',
-                    'value' => $match[1],
-                    'translation_key' => Str::snake($match[1]),
-                    'has_translation' => false,
-                ];
-            }
-        }
+        $this->collectHeadingProperty($stats, $seenKeys, $content);
 
         return $stats;
+    }
+
+    /**
+     * @param  callable(string): bool  $shouldInclude
+     */
+    protected function collectStat(array &$stats, array &$seenKeys, string $type, callable $shouldInclude, string $content, string $pattern): void
+    {
+        if (! preg_match_all($pattern, $content, $matches, PREG_SET_ORDER)) {
+            return;
+        }
+
+        foreach ($matches as $match) {
+            $value = $match[1];
+
+            if (! $shouldInclude($value)) {
+                continue;
+            }
+
+            $translationKey = $this->generateTranslationKey($value, $type);
+            $dedupeKey = "{$type}:{$translationKey}";
+
+            if (isset($seenKeys[$dedupeKey])) {
+                continue;
+            }
+
+            $seenKeys[$dedupeKey] = true;
+
+            $stats[] = [
+                'type' => $type,
+                'value' => $value,
+                'translation_key' => $translationKey,
+                'has_translation' => str_contains($match[0], '__('),
+            ];
+        }
+    }
+
+    protected function collectHeadingProperty(array &$stats, array &$seenKeys, string $content): void
+    {
+        $patterns = [
+            '/protected\s+static\s+\?string\s+\$heading\s*=\s*[\'"]([^\'"]+)[\'"]\s*;/',
+            '/protected\s+static\s+string\s+\$heading\s*=\s*[\'"]([^\'"]+)[\'"]\s*;/',
+        ];
+
+        foreach ($patterns as $pattern) {
+            if (! preg_match($pattern, $content, $match)) {
+                continue;
+            }
+
+            $value = $match[1];
+            $translationKey = 'heading';
+            $dedupeKey = "heading_property:{$translationKey}";
+
+            if (isset($seenKeys[$dedupeKey])) {
+                continue;
+            }
+
+            $seenKeys[$dedupeKey] = true;
+
+            $stats[] = [
+                'type' => 'widget_heading_property',
+                'value' => $value,
+                'translation_key' => $translationKey,
+                'has_translation' => false,
+            ];
+        }
+
+        if (preg_match('/public\s+(?:static\s+)?function\s+getHeading\s*\([^)]*\)\s*:\s*\??string\s*\{[^}]*return\s+[\'"]([^\'"]+)[\'"]\s*;/s', $content, $match)) {
+            $value = $match[1];
+            $translationKey = 'heading';
+            $dedupeKey = "heading_method:{$translationKey}";
+
+            if (! isset($seenKeys[$dedupeKey])) {
+                $seenKeys[$dedupeKey] = true;
+
+                $stats[] = [
+                    'type' => 'widget_heading_method',
+                    'value' => $value,
+                    'translation_key' => $translationKey,
+                    'has_translation' => false,
+                ];
+            }
+        }
+    }
+
+    protected function generateTranslationKey(string $value, string $type): string
+    {
+        if ($type === 'widget_heading_property' || $type === 'widget_heading_method') {
+            return 'heading';
+        }
+
+        return Str::snake($value);
     }
 
     protected function hasCustomContent(string $content): bool
     {
         $patterns = [
-            // Stat::make with hardcoded strings
             '/Stat::make\s*\(\s*[\'"][^\'"]+[\'"]\s*,\s*[^)]+\)/',
-
-            // Description with hardcoded strings
-            '/->description\s*\(\s*[\'"][^\'"]+[\'"]\s*\)/',
-
-            // Other widget properties with hardcoded strings
-            '/->(?:title|label|placeholder|helper|hint)\s*\(\s*[\'"][^\'"]+[\'"]\s*\)/',
-
-            // String literals in widget methods
-            '/[\'"][A-Z][a-zA-Z\s]+[\'"]/',
+            '/->(?:description|title|heading|label|placeholder|helper|hint)\s*\(\s*[\'"][^\'"]+[\'"]\s*\)/',
+            '/protected\s+static\s+(?:\?string|string)\s+\$heading\s*=\s*[\'"][^\'"]+[\'"]/',
+            '/function\s+getHeading\s*\(/',
         ];
 
         foreach ($patterns as $pattern) {

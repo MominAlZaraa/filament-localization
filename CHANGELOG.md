@@ -2,6 +2,45 @@
 
 All notable changes to `filament-localization` will be documented in this file.
 
+## v2.1.2 - 2026-07-03
+
+### Fixed
+
+- **Table actions on resources** — Resources now detect and localize Filament table actions beyond generic `Action::make()`, including `EditAction::make()`, `DeleteAction::make()`, `CreateAction::make()`, `BulkAction`, `RestoreAction`, `ForceDeleteAction`, and other common action types. Unnamed `::make()` calls (Filament v5 style) are supported.
+- **Table filters on resources** — Filter label detection now uses the correct component class (`SelectFilter`, `TernaryFilter`, `TrashedFilter`, etc.) instead of a generic `Filter::make()` pattern, so filters with existing labels are handled correctly and missing labels are added reliably.
+- **Separate table schema files** — Actions and filters defined in dedicated table schema classes (e.g. `UserTable::configure()`) are now analyzed, translated, and modified alongside columns.
+
+### Enhanced
+
+- **Widget localization** — Widget analyzer and modifier now detect and localize widget headings (`$heading` property, `getHeading()`), stat descriptions, and additional widget text via `->heading()`, `->title()`, and related helpers.
+
+## v2.1.1 - 2026-04-10
+
+### Added
+
+- **Resource localization** — Infolist body scanning, navigation group keys (`UnitEnum|string`), and `getNavigationGroup()` wrapping.
+- **Relation manager localization** — Table empty state, KeyValue labels, action modal copy, `CreateAction::make()` without name, and literal `->label()` handling.
+- **Page titles** — Inject `getTitle()` with `__()` when still using the Filament base implementation.
+- **Discovery** — Namespaced `RelationManager::class` resolution in `filament:localize`.
+- **Tests** — Coverage for `ResourceAnalyzer` and `RelationManagerAnalyzer`.
+
+## v2.1.0 - 2026-03-25
+
+### Added
+
+- **Laravel 13** — Composer allows `laravel/framework: ^12.0|^13.0`.
+
+### Changed
+
+- **PHP** — Requirement restored to `^8.3` (from `^8.2` in v2.0.1) to align with Laravel 13's minimum PHP version.
+- **CI** — GitHub Actions matrix tests Laravel 12 and 13 with Orchestra Testbench 10 and 11.
+- **Dev dependencies** — Pest 4.x, Testbench `^10.0|^11.0`.
+
+### Compatibility
+
+- **Supported**: PHP ^8.3–^8.5, Laravel ^12.0 | ^13.0, Filament ^5.0, Livewire ^4.0.
+- **Note**: Laravel 12 on PHP 8.2 is not supported in v2.1.x; use [v2.0.1](https://github.com/MominAlZaraa/filament-localization/releases/tag/v2.0.1) if you need PHP 8.2 on Laravel 12 only.
+
 ## v2.0.1 - 2026-01-31
 
 ### Changed

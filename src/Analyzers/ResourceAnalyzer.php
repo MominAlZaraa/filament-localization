@@ -61,6 +61,31 @@ class ResourceAnalyzer
         'Group',
     ];
 
+    protected array $actionComponents = [
+        'Action',
+        'CreateAction',
+        'EditAction',
+        'DeleteAction',
+        'ViewAction',
+        'RestoreAction',
+        'ForceDeleteAction',
+        'ReplicateAction',
+        'BulkAction',
+        'DeleteBulkAction',
+        'RestoreBulkAction',
+        'ForceDeleteBulkAction',
+        'ExportAction',
+        'ImportAction',
+    ];
+
+    protected array $filterComponents = [
+        'SelectFilter',
+        'TernaryFilter',
+        'Filter',
+        'TrashedFilter',
+        'DateFilter',
+    ];
+
     public function analyze(string $resourceClass, $panel): array
     {
         $reflection = new ReflectionClass($resourceClass);
@@ -132,14 +157,37 @@ class ResourceAnalyzer
             }
         }
 
-        // Analyze actions
+        // Analyze actions (resource file)
         $analysis['actions'] = $this->analyzeActions($content);
 
         // Analyze sections and layout components
         $analysis['sections'] = $this->analyzeSections($content);
 
-        // Analyze filters
+        // Analyze filters (resource file)
         $analysis['filters'] = $this->analyzeFilters($content);
+
+        // Analyze actions and filters from separate table schema files
+        foreach ($schemaFiles['table'] ?? [] as $schemaFile) {
+            if (! File::exists($schemaFile['path'])) {
+                continue;
+            }
+
+            $schemaContent = File::get($schemaFile['path']);
+
+            $schemaActions = $this->analyzeActions($schemaContent);
+            foreach ($schemaActions as &$action) {
+                $action['schema_file'] = $schemaFile['path'];
+                $action['schema_class'] = $schemaFile['class'];
+            }
+            $analysis['actions'] = array_merge($analysis['actions'], $schemaActions);
+
+            $schemaFilters = $this->analyzeFilters($schemaContent);
+            foreach ($schemaFilters as &$filter) {
+                $filter['schema_file'] = $schemaFile['path'];
+                $filter['schema_class'] = $schemaFile['class'];
+            }
+            $analysis['filters'] = array_merge($analysis['filters'], $schemaFilters);
+        }
 
         // Infolist entries live on many resources (static infolist()); scope to that method body when possible
         $infolistBody = $this->extractInfolistMethodInnerContent($content);
@@ -352,27 +400,103 @@ class ResourceAnalyzer
     protected function analyzeActions(string $content): array
     {
         $actions = [];
+        $foundActions = [];
 
-        // Match patterns like: Action::make('action_name')
-        $pattern = "/Action::make\(['\"]([^'\"]+)['\"]\)/";
+        foreach ($this->actionComponents as $component) {
+            $pattern = "/(?<![:\w]){$component}::make\(['\"]([^'\"]+)['\"]\)/";
 
-        preg_match_all($pattern, $content, $matches);
+            preg_match_all($pattern, $content, $matches);
 
-        if (! empty($matches[1])) {
-            foreach ($matches[1] as $actionName) {
-                // Check if this action already has a label
-                $hasLabel = $this->hasLabel($content, $actionName, 'Action');
+            if (! empty($matches[1])) {
+                foreach ($matches[1] as $actionName) {
+                    $key = "{$component}::{$actionName}";
+                    if (isset($foundActions[$key])) {
+                        continue;
+                    }
+
+                    $foundActions[$key] = true;
+
+                    $hasLabel = $this->hasLabel($content, $actionName, $component);
+
+                    $actions[] = [
+                        'name' => $actionName,
+                        'component' => $component,
+                        'has_label' => $hasLabel,
+                        'default_label' => $this->generateLabel($actionName),
+                        'translation_key' => $this->generateTranslationKey($actionName),
+                    ];
+                }
+            }
+
+            // Filament v5: CreateAction::make() / EditAction::make() with no name
+            $emptyMakePattern = "/(?<![:\\w]){$component}::make\(\)/";
+            preg_match_all($emptyMakePattern, $content, $emptyMatches, PREG_OFFSET_CAPTURE);
+
+            foreach ($emptyMatches[0] ?? [] as $occurrence) {
+                $syntheticName = $this->syntheticActionName($component);
+                $key = "{$component}::{$syntheticName}";
+
+                if (isset($foundActions[$key])) {
+                    continue;
+                }
+
+                $foundActions[$key] = true;
+
+                $hasLabel = $this->hasLabelAfterPosition($content, $occurrence[1], $component);
 
                 $actions[] = [
-                    'name' => $actionName,
+                    'name' => $syntheticName,
+                    'component' => $component,
                     'has_label' => $hasLabel,
-                    'default_label' => $this->generateLabel($actionName),
-                    'translation_key' => $this->generateTranslationKey($actionName),
+                    'default_label' => $this->generateLabel($syntheticName),
+                    'translation_key' => $this->generateTranslationKey($syntheticName),
+                    'unnamed_make' => true,
                 ];
             }
         }
 
         return $actions;
+    }
+
+    protected function syntheticActionName(string $component): string
+    {
+        return match ($component) {
+            'CreateAction' => 'create',
+            'EditAction' => 'edit',
+            'DeleteAction' => 'delete',
+            'ViewAction' => 'view',
+            'RestoreAction' => 'restore',
+            'ForceDeleteAction' => 'force_delete',
+            'ReplicateAction' => 'replicate',
+            'BulkAction' => 'bulk',
+            'DeleteBulkAction' => 'delete_bulk',
+            'RestoreBulkAction' => 'restore_bulk',
+            'ForceDeleteBulkAction' => 'force_delete_bulk',
+            'ExportAction' => 'export',
+            'ImportAction' => 'import',
+            default => Str::snake(str_replace('Action', '', $component)),
+        };
+    }
+
+    protected function hasLabelAfterPosition(string $content, int $makePosition, string $component): bool
+    {
+        $prefix = $component.'::make()';
+        $startPos = $makePosition + strlen($prefix);
+        $slice = $this->sliceChainAfterMake($content, $startPos);
+
+        return str_contains($slice, '->label(');
+    }
+
+    protected function sliceChainAfterMake(string $content, int $startPos): string
+    {
+        $len = strlen($content);
+        $endPattern = "/\n\s*(?:\w+::make\(|[\]\}]\))/";
+
+        if (preg_match($endPattern, $content, $endMatches, PREG_OFFSET_CAPTURE, $startPos)) {
+            return substr($content, $startPos, $endMatches[0][1] - $startPos);
+        }
+
+        return substr($content, $startPos, min(4000, $len - $startPos));
     }
 
     protected function analyzeSections(string $content): array
@@ -443,22 +567,60 @@ class ResourceAnalyzer
     protected function analyzeFilters(string $content): array
     {
         $filters = [];
+        $foundFilters = [];
 
-        // Match patterns like: SelectFilter::make('status')
-        $pattern = "/(?:Select|Ternary|)Filter::make\(['\"]([^'\"]+)['\"]\)/";
+        foreach ($this->filterComponents as $component) {
+            $pattern = "/(?<![:\w]){$component}::make\(['\"]([^'\"]+)['\"]\)/";
 
-        preg_match_all($pattern, $content, $matches);
+            preg_match_all($pattern, $content, $matches);
 
-        if (! empty($matches[1])) {
-            foreach ($matches[1] as $filterName) {
-                $hasLabel = $this->hasLabel($content, $filterName, 'Filter');
+            if (! empty($matches[1])) {
+                foreach ($matches[1] as $filterName) {
+                    $key = "{$component}::{$filterName}";
+                    if (isset($foundFilters[$key])) {
+                        continue;
+                    }
 
-                $filters[] = [
-                    'name' => $filterName,
-                    'has_label' => $hasLabel,
-                    'default_label' => $this->generateLabel($filterName),
-                    'translation_key' => $this->generateTranslationKey($filterName),
-                ];
+                    $foundFilters[$key] = true;
+
+                    $hasLabel = $this->hasLabel($content, $filterName, $component);
+
+                    $filters[] = [
+                        'name' => $filterName,
+                        'component' => $component,
+                        'has_label' => $hasLabel,
+                        'default_label' => $this->generateLabel($filterName),
+                        'translation_key' => $this->generateTranslationKey($filterName),
+                    ];
+                }
+            }
+
+            // TrashedFilter::make() and similar unnamed filters
+            if ($component === 'TrashedFilter') {
+                $emptyMakePattern = "/(?<![:\\w])TrashedFilter::make\(\)/";
+                preg_match_all($emptyMakePattern, $content, $emptyMatches, PREG_OFFSET_CAPTURE);
+
+                foreach ($emptyMatches[0] ?? [] as $occurrence) {
+                    $syntheticName = 'trashed';
+                    $key = "TrashedFilter::{$syntheticName}";
+
+                    if (isset($foundFilters[$key])) {
+                        continue;
+                    }
+
+                    $foundFilters[$key] = true;
+
+                    $hasLabel = $this->hasLabelAfterPosition($content, $occurrence[1], 'TrashedFilter');
+
+                    $filters[] = [
+                        'name' => $syntheticName,
+                        'component' => 'TrashedFilter',
+                        'has_label' => $hasLabel,
+                        'default_label' => 'Trashed',
+                        'translation_key' => $syntheticName,
+                        'unnamed_make' => true,
+                    ];
+                }
             }
         }
 

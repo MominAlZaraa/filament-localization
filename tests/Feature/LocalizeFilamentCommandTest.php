@@ -8,7 +8,6 @@ test('localize filament command can be executed', function () {
     Filament::shouldReceive('getPanels')
         ->andReturn([]);
 
-    // @phpstan-ignore-next-line
     $this->artisan('filament:localize --help')
         ->assertExitCode(0);
 });
@@ -18,7 +17,6 @@ test('localize filament command shows help without errors', function () {
     Filament::shouldReceive('getPanels')
         ->andReturn([]);
 
-    // @phpstan-ignore-next-line
     $this->artisan('filament:localize --help')
         ->assertExitCode(0);
 });
@@ -30,7 +28,6 @@ test('localize filament command handles missing resources gracefully', function 
 
     // Test with dry run only (removed --resource option as it doesn't exist)
     // When no panels are found, command returns exit code 1
-    // @phpstan-ignore-next-line
     $this->artisan('filament:localize', [
         '--dry-run' => true,
     ])
@@ -43,7 +40,6 @@ test('localize filament command works with dry run', function () {
         ->andReturn([]);
 
     // When no panels are found, command returns exit code 1
-    // @phpstan-ignore-next-line
     $this->artisan('filament:localize', [
         '--dry-run' => true,
     ])
