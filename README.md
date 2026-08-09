@@ -7,6 +7,8 @@
 [![License](https://img.shields.io/packagist/l/mominalzaraa/filament-localization?style=flat-square)](https://github.com/MominAlZaraa/filament-localization/blob/main/LICENSE)
 [![PHP Version](https://img.shields.io/packagist/dependency-v/mominalzaraa/filament-localization/php?style=flat-square&logo=php)](https://packagist.org/packages/mominalzaraa/filament-localization)
 [![Sponsor](https://img.shields.io/github/sponsors/MominAlZaraa?style=flat-square&logo=github)](https://github.com/sponsors/MominAlZaraa)
+[![Plumb score](https://plumbphp.dev/badges/mominalzaraa/filament-localization/composite.svg)](https://plumbphp.dev/mominalzaraa/filament-localization)
+[![Plumb security score](https://plumbphp.dev/badges/mominalzaraa/filament-localization/security.svg)](https://plumbphp.dev/mominalzaraa/filament-localization)
 
 ![Filament Localization Banner](.github/plugin-banner.jpg)
 
