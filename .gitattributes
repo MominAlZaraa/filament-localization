@@ -20,3 +20,8 @@
 /QUICK_START.md         export-ignore
 /TESTING.md             export-ignore
 /CHANGELOG.md           export-ignore
+
+/.claude                export-ignore
+/.cursor                export-ignore
+/AGENTS.md              export-ignore
+/.mcp.json              export-ignore

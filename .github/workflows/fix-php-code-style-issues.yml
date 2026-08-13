@@ -39,8 +39,8 @@ jobs:
 
       - name: Pull latest changes and rebase
         run: |
-          git config --global user.email "github-actions[bot]@users.noreply.github.com"
-          git config --global user.name "github-actions[bot]"
+          git config --global user.email "64691179+MominAlZaraa@users.noreply.github.com"
+          git config --global user.name "Momin Al Zaraa"
           git pull origin main --rebase
         if: github.event_name == 'push'
 
@@ -48,4 +48,6 @@ jobs:
         uses: stefanzweifel/git-auto-commit-action@b863ae1933cb653a53c021fe36dbb774e1fb9403 # v5.2.0
         with:
           commit_message: Fix styling
+          commit_user_name: Momin Al Zaraa
+          commit_user_email: 64691179+MominAlZaraa@users.noreply.github.com
         if: github.event_name == 'push'
